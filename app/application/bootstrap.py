@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 from app.application.service import TranslatorApplication
+from app.infrastructure.paths import whisper_model_path
 
 
 def build_application() -> TranslatorApplication:
@@ -24,7 +24,7 @@ def build_application() -> TranslatorApplication:
     from engines.vad.energy import EnergyVoiceActivityDetector
     from app.application.pipeline import TranslationPipeline
 
-    model_path = Path("models") / "whisper" / DEFAULT_ASR_MODEL
+    model_path = whisper_model_path(DEFAULT_ASR_MODEL)
     source = SoundCardSystemAudioSource(
         DEFAULT_SAMPLE_RATE, DEFAULT_CHANNELS, DEFAULT_AUDIO_BLOCK_FRAMES
     )
