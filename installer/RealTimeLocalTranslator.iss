@@ -1,7 +1,7 @@
 ; Inno Setup script for the packaged desktop application.
 
 #define MyAppName "Real-Time Local Translator"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "MonarcaDelVacio"
 
 [Setup]
@@ -10,11 +10,15 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Real-Time Local Translator
+DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=RealTimeLocalTranslatorSetup
-Compression=lzma
+OutputDir=..\dist\installer
+OutputBaseFilename=RealTimeLocalTranslatorSetup-{#MyAppVersion}
+Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+ArchitecturesInstallIn64BitMode=x64compatible
+PrivilegesRequired=admin
 UninstallDisplayIcon={app}\RealTimeLocalTranslator.exe
 
 [Files]
