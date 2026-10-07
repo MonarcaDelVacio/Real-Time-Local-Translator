@@ -24,7 +24,7 @@ class FakeSource(AudioSource):
 
 class FakeVAD(VoiceActivityDetector):
     def is_speech(self, chunk):
-        return chunk.samples == b"speech"
+        return chunk.samples.startswith(b"speech")
 
 
 class FakeASR(ASREngine):
