@@ -23,10 +23,12 @@ UninstallDisplayIcon={app}\RealTimeLocalTranslator.exe
 
 [Files]
 Source: "..\dist\RealTimeLocalTranslator\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+Source: "..\redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{autodesktop}\Real-Time Local Translator"; Filename: "{app}\RealTimeLocalTranslator.exe"
 Name: "{autoprograms}\Real-Time Local Translator"; Filename: "{app}\RealTimeLocalTranslator.exe"
 
 [Run]
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Instalando componente Microsoft Visual C++ necesario…"; Flags: waituntilterminated
 Filename: "{app}\RealTimeLocalTranslator.exe"; Description: "Iniciar Real-Time Local Translator"; Flags: nowait postinstall skipifsilent
