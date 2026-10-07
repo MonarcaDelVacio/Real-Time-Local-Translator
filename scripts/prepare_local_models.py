@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
 TRANSLATION_PAIRS = [
     ("en", "es"), ("es", "en"), ("en", "pt"), ("pt", "en"),
@@ -20,14 +21,8 @@ def main() -> int:
         model_dir = Path("models") / "whisper" / DEFAULT_ASR_MODEL
         model_dir.mkdir(parents=True, exist_ok=True)
         print(f"Preparing local Whisper model: {DEFAULT_ASR_MODEL}")
-        local_path = download_model(
-            DEFAULT_ASR_MODEL,
-            output_dir=str(model_dir),
-            local_files_only=False,
-        )
+        local_path = download_model(DEFAULT_ASR_MODEL, output_dir=str(model_dir))
         print(f"Whisper model ready at: {local_path}")
-
-        # Load once now to verify the local CTranslate2 model and runtime compute type.
         WhisperModel(
             str(model_dir),
             device=DEFAULT_ASR_DEVICE,
@@ -59,6 +54,18 @@ def main() -> int:
             print(f"Installing local translation package {source}->{target}")
             package.install_from_path(match.download())
 
+        # Make Argos packages portable with the application build.
+        portable_dir = Path("models") / "argos"
+        portable_dir.mkdir(parents=True, exist_ok=True)
+        for pkg in package.get_installed_packages():
+            if pkg.type != "translate" or not pkg.package_path.exists():
+                continue
+            destination = portable_dir / pkg.package_path.name
+            if destination.exists():
+                shutil.rmtree(destination)
+            shutil.copytree(pkg.package_path, destination)
+
+        print(f"Portable Argos packages copied to: {portable_dir}")
         print("Local model preparation completed.")
         return 0
     except Exception as exc:
