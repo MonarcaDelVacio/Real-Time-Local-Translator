@@ -58,7 +58,7 @@ def test_pipeline_flushes_when_utterance_reaches_limit():
         max_utterance_seconds=0.05,
         max_buffer_chunks=10,
     )
-    result = p.process_chunk(AudioChunk(b"speech" * 600, 16000, 1, 0))
+    result = p.process_chunk(AudioChunk(b"speech" * 1000, 16000, 1, 0))
     assert result and result[0].translated_text == "hola"
 
 
