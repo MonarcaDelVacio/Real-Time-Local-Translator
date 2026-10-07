@@ -1,8 +1,8 @@
-# Windows test procedure
+# Windows test procedure — Preview 0.3.0
 
 ## Objetivo
 
-Validar la primera Preview distribuible sobre Windows real. GitHub Actions puede comprobar instalación, tests y construcción, pero no puede sustituir la prueba del audio de reproducción del PC.
+Validar el circuito completo sobre Windows real.
 
 ## 1. Instalar
 
@@ -10,25 +10,22 @@ Usa `RealTimeLocalTranslatorSetup-0.3.0.exe`.
 
 No necesitas instalar Python.
 
-## 2. Preparar el audio
+## 2. Prueba Inglés → Español
 
-1. Conecta los auriculares o altavoces que utilizas normalmente.
-2. Comprueba que Windows los tenga como dispositivo de salida predeterminado.
-3. Reproduce una voz clara: vídeo, reunión grabada o navegador.
+1. Conecta tus auriculares o altavoces.
+2. Comprueba que sean el dispositivo de salida predeterminado de Windows.
+3. Reproduce una voz clara en inglés.
 4. Abre el traductor.
+5. Selecciona **Español**.
+6. Pulsa **Iniciar**.
+7. Espera el primer segmento traducido.
+8. Pulsa **Detener**.
 
-## 3. Primera prueba
+## 3. Prueba Español → Inglés
 
-1. Selecciona **Español** como destino.
-2. Pulsa **Iniciar**.
-3. Espera unos segundos.
-4. Comprueba que aparezcan segmentos en la ventana.
-5. Cambia el audio de origen si quieres comprobar otros idiomas.
-6. Pulsa **Detener**.
+Repite el procedimiento reproduciendo una voz en español y seleccionando **English**.
 
 ## Resultado esperado
-
-La cadena debe funcionar así:
 
 Windows playback
 → WASAPI Loopback
@@ -40,21 +37,16 @@ Windows playback
 
 ## Si no captura audio
 
-La versión de desarrollo incluye:
+En la versión de desarrollo puedes ejecutar:
 
 `scripts\\diagnose_audio.py`
 
-Ejecuta el diagnóstico mientras se está reproduciendo audio. Debe detectar el dispositivo de reproducción predeterminado y bloques no silenciosos.
+mientras se reproduce audio. El diagnóstico debe detectar el dispositivo de reproducción predeterminado y bloques no silenciosos.
 
-## Limitaciones conocidas de la Preview
+## Limitaciones de la Preview
 
-- La calidad de traducción depende de los paquetes Argos instalados.
-- El modelo Whisper `small` prioriza equilibrio entre precisión y consumo de CPU.
-- La latencia todavía debe medirse en hardware real.
-- La Preview utiliza un VAD energético; posteriormente se puede sustituir por un VAD neuronal.
-- El soporte de distintos dispositivos de audio y configuraciones multicanal se seguirá ampliando.
-
-La Preview no debe considerarse una versión final hasta completar estas pruebas.
-
-## CI validation
-The Windows build workflow also runs for pull requests targeting `main`.
+- Solo se distribuyen Inglés ↔ Español en esta primera prueba.
+- La calidad depende del modelo Whisper y de los paquetes Argos.
+- La latencia y el consumo deben medirse en hardware real.
+- El VAD actual es un detector energético básico.
+- La Preview no debe considerarse una versión final hasta completar las pruebas.
