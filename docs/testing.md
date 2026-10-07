@@ -55,3 +55,6 @@ Ejecuta el diagnóstico mientras se está reproduciendo audio. Debe detectar el 
 - El soporte de distintos dispositivos de audio y configuraciones multicanal se seguirá ampliando.
 
 La Preview no debe considerarse una versión final hasta completar estas pruebas.
+
+## CI validation
+The Windows build workflow also runs for pull requests targeting `main`.
