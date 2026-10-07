@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from app.domain.models import AudioChunk, DetectedLanguage, TranscriptSegment, TranslationSegment
 
-
 class AudioSource(ABC):
     @abstractmethod
     def start(self) -> None: ...
@@ -12,21 +11,17 @@ class AudioSource(ABC):
     @abstractmethod
     def stop(self) -> None: ...
 
-
 class VoiceActivityDetector(ABC):
     @abstractmethod
     def is_speech(self, chunk: AudioChunk) -> bool: ...
-
 
 class ASREngine(ABC):
     @abstractmethod
     def transcribe(self, chunks: Iterable[AudioChunk]) -> Iterable[TranscriptSegment]: ...
 
-
 class LanguageDetector(ABC):
     @abstractmethod
     def detect(self, text: str) -> DetectedLanguage: ...
-
 
 class TranslationEngine(ABC):
     @abstractmethod
