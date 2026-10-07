@@ -1,26 +1,33 @@
 # Real-Time Local Translator
 
-Traductor de audio en tiempo real para Windows, diseñado para reuniones, clases, llamadas y contenido multimedia.
+Traductor de audio del sistema en tiempo real para Windows, diseñado para reuniones, clases, llamadas y contenido multimedia.
 
 ## Objetivo
 
-Capturar el audio que reproduce el PC, detectar el idioma hablado, transcribirlo y traducirlo localmente en tiempo real.
+Capturar el audio que reproduce el PC, detectar automáticamente el idioma hablado, transcribirlo y traducirlo localmente.
 
-## Principio fundamental
+## Principios
 
-**Local First:** el uso normal no requiere API, cuenta, suscripción, créditos, servidor externo ni pago por minuto. Después de preparar los modelos y paquetes locales, el procesamiento puede realizarse sin conexión.
+- **Gratis y local:** no requiere API de pago, cuenta, suscripción, créditos ni servidor externo.
+- **Offline después de la preparación:** Internet se utiliza durante la instalación inicial para descargar modelos y paquetes; el procesamiento normal es local.
+- **Audio del sistema:** utiliza Windows WASAPI Loopback mediante SoundCard, por lo que puede capturar Zoom, Meet, Teams, Discord, navegador y otras aplicaciones que reproduzcan audio.
+- **Arquitectura reemplazable:** los motores están aislados detrás de contratos de dominio.
 
 ## Arquitectura
 
-Audio de Windows → WASAPI Loopback → VAD → faster-whisper → idioma detectado → Argos Translate → interfaz PySide6
+Windows system audio → WASAPI Loopback → VAD → faster-whisper → idioma detectado → Argos Translate → PySide6
 
-La aplicación mantiene una separación estricta entre dominio, aplicación, infraestructura y presentación para poder reemplazar motores sin rehacer la interfaz.
+faster-whisper permite cargar un modelo CTranslate2 desde un directorio local y ejecutar con 'local_files_only=True'; esto evita descargas durante el uso normal. citeturn3search0turn3search2
+
+SoundCard proporciona captura de loopback para Windows. citeturn0search0
+
+Argos Translate funciona con paquetes de traducción instalados localmente y puede encadenar idiomas intermedios cuando existen los paquetes necesarios. citeturn1search0turn1search4
 
 ## Tecnologías
 
 - Python 3.11+
 - PySide6
-- SoundCard + Windows WASAPI loopback
+- SoundCard + Windows WASAPI Loopback
 - faster-whisper / Whisper local
 - Argos Translate local
 - NumPy
@@ -28,43 +35,60 @@ La aplicación mantiene una separación estricta entre dominio, aplicación, inf
 - PyInstaller
 - Inno Setup
 
-faster-whisper ejecuta Whisper mediante CTranslate2 y permite cargar modelos locales; Argos Translate es un motor de traducción offline que utiliza paquetes de idiomas locales.
+## Probar en Windows
 
-## Desarrollo en Windows
+### Opción de desarrollo
 
-1. Instala Python 3.11 o superior.
-2. Ejecuta `powershell -ExecutionPolicy Bypass -File scripts\\run_dev.ps1`.
-3. El script crea el entorno virtual, instala las dependencias y prepara los modelos locales.
-4. Para validar primero la captura de audio, ejecuta `python scripts\\diagnose_audio.py` mientras se reproduce audio por Windows.
-5. Ejecuta las pruebas con `pytest`.
+1. Instala Python 3.11.
+2. Descarga/clona el repositorio.
+3. Ejecuta scripts\\run_dev.bat.
+4. La primera preparación descarga el modelo Whisper y los paquetes Argos.
+5. Reproduce audio por los altavoces/auriculares de Windows.
+6. Ejecuta scripts\\diagnose_audio.py si quieres validar primero la captura.
+7. La aplicación se abre después de preparar los modelos.
 
-La preparación inicial puede necesitar Internet porque descarga los modelos y paquetes. Una vez instalados, el funcionamiento normal no depende de servicios externos.
+La primera preparación puede tardar y ocupar varios cientos de MB. Después, el procesamiento no necesita conexión.
 
-## Estado actual
+### Crear el instalador
 
-- [x] Estructura por capas
-- [x] Contratos de dominio
+En Windows, con las dependencias preparadas:
+
+powershell -ExecutionPolicy Bypass -File build\\build_windows.ps1
+
+Después abre installer\\RealTimeLocalTranslator.iss con Inno Setup para generar el instalador.
+
+El build copia los modelos locales dentro de la distribución. El objetivo es que el instalador final pueda ejecutarse sin Python instalado.
+
+## Estado de la versión 0.2.0
+
+- [x] Arquitectura por capas
 - [x] Captura Windows WASAPI loopback
-- [x] VAD local básico por energía
-- [x] Adaptador faster-whisper
-- [x] Adaptador Argos Translate
-- [x] Pipeline streaming inicial
-- [x] Interfaz de escritorio inicial
-- [x] Preparación local de modelos
-- [x] Script de diagnóstico de audio
-- [x] Base PyInstaller/Inno Setup
-- [ ] VAD neuronal optimizado
-- [ ] Detección y segmentación avanzada de idioma
-- [ ] Subtítulos incrementales de baja latencia
-- [ ] Configuración completa de dispositivos/modelos
-- [ ] Historial y sesiones
-- [ ] Instalador final autocontenido
-- [ ] Validación de rendimiento en distintos equipos
+- [x] VAD local básico
+- [x] faster-whisper local
+- [x] Detección automática de idioma mediante Whisper
+- [x] Argos Translate local
+- [x] Paquetes Argos portables dentro de models/argos
+- [x] Segmentación por silencio
+- [x] Límite de duración/buffer
+- [x] Errores aislados por segmento
+- [x] Interfaz PySide6 inicial
+- [x] Build PyInstaller
+- [x] Instalador Inno Setup
+- [x] Build automatizado de Windows mediante GitHub Actions
+- [ ] Validación real de WASAPI en hardware Windows
+- [ ] Medición de latencia y rendimiento en equipos modestos
+- [ ] VAD neuronal de mejor calidad
+- [ ] Historial de sesiones
+- [ ] Configuración avanzada de dispositivo/modelo
+- [ ] Pulido visual y accesibilidad
+- [ ] Firma digital del instalador
+
+**Importante:** esta versión ya tiene una ruta de construcción para obtener un ejecutable de Windows, pero no debe considerarse una versión final hasta probar captura, ASR y traducción en un Windows real.
 
 ## Privacidad
 
-El audio de reuniones no se envía a un proveedor de traducción o transcripción. Las grabaciones de diagnóstico son temporales y están excluidas de Git.
+El audio de las reuniones no se envía a un proveedor externo. Los modelos y paquetes se procesan localmente. Los datos de ejecución, logs y grabaciones de diagnóstico no se incluyen en Git.
 
-## Licencias
+## Licencia
 
-Las licencias de las dependencias y modelos deberán revisarse antes de publicar una distribución final. El proyecto no incorpora servicios de pago ni APIs comerciales obligatorias.
+MIT para el código de este proyecto. Las licencias de modelos y dependencias de terceros deben revisarse antes de redistribuir una versión comercial o pública.
