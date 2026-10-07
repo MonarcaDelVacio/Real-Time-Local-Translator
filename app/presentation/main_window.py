@@ -112,7 +112,7 @@ def run_gui(application) -> int:
         )
         worker.status_changed.connect(status.setText)
         worker.failed.connect(lambda error: status.setText(f"Error: {error}"))
-        worker.finished_cleanly.connect(lambda: status.setText("Detenido"))
+        worker.finished_cleanly.connect(lambda: finish_session())
         worker.start()
 
         start.setEnabled(False)
@@ -129,6 +129,12 @@ def run_gui(application) -> int:
                     "Cierre pendiente",
                     "El motor todavía está finalizando la captura. Espera unos segundos.",
                 )
+        start.setEnabled(True)
+        stop.setEnabled(False)
+        target.setEnabled(True)
+
+    def finish_session():
+        status.setText("Detenido")
         start.setEnabled(True)
         stop.setEnabled(False)
         target.setEnabled(True)
