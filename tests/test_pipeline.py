@@ -78,4 +78,4 @@ def test_pipeline_reports_segment_error_and_keeps_running():
         lambda: True,
         errors.append,
     )
-    assert errors == []
+    assert len(errors) == 1\n    assert "translation unavailable" in str(errors[0])
