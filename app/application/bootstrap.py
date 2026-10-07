@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 from app.application.service import TranslatorApplication
-from app.infrastructure.paths import whisper_model_path
+from app.infrastructure.paths import project_root, whisper_model_path
 
 
 def build_application() -> TranslatorApplication:
-    """Build the runtime graph and fail visibly when local assets are missing."""
+    """Build the runtime graph using only bundled/local assets."""
     from config.defaults import (
         DEFAULT_ASR_COMPUTE_TYPE,
         DEFAULT_ASR_DEVICE,
@@ -18,6 +19,10 @@ def build_application() -> TranslatorApplication:
         DEFAULT_SILENCE_CHUNKS,
         DEFAULT_TARGET_LANGUAGE,
     )
+
+    root = project_root()
+    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(root / "models" / "argos"))
+
     from engines.audio.soundcard_backend import SoundCardSystemAudioSource
     from engines.asr.faster_whisper_engine import FasterWhisperASR
     from engines.translation.argos_engine import ArgosTranslationEngine
