@@ -9,19 +9,20 @@ Capturar el audio que reproduce el PC, detectar automáticamente el idioma habla
 ## Principios
 
 - **Gratis y local:** no requiere API de pago, cuenta, suscripción, créditos ni servidor externo.
-- **Offline después de la preparación:** Internet se utiliza durante la instalación inicial para descargar modelos y paquetes; el procesamiento normal es local.
+- **Offline durante el uso:** la compilación distribuida incluye los modelos locales preparados; no necesita Internet para transcribir o traducir.
 - **Audio del sistema:** utiliza Windows WASAPI Loopback mediante SoundCard, por lo que puede capturar Zoom, Meet, Teams, Discord, navegador y otras aplicaciones que reproduzcan audio.
 - **Arquitectura reemplazable:** los motores están aislados detrás de contratos de dominio.
+- **Interfaz sin bloqueo:** Whisper y la captura se inicializan en un hilo de trabajo, no en el hilo de la interfaz.
 
 ## Arquitectura
 
 Windows system audio → WASAPI Loopback → VAD → faster-whisper → idioma detectado → Argos Translate → PySide6
 
-faster-whisper permite cargar un modelo CTranslate2 desde un directorio local y ejecutar con 'local_files_only=True'; esto evita descargas durante el uso normal.
+faster-whisper puede cargar un modelo CTranslate2 desde un directorio local y usar `local_files_only=True`, evitando descargas durante el uso normal.
 
 SoundCard proporciona captura de loopback para Windows.
 
-Argos Translate funciona con paquetes de traducción instalados localmente y puede encadenar idiomas intermedios cuando existen los paquetes necesarios.
+Argos Translate usa paquetes de traducción instalados localmente y puede utilizar idiomas intermedios cuando existen los paquetes necesarios.
 
 ## Tecnologías
 
@@ -35,31 +36,42 @@ Argos Translate funciona con paquetes de traducción instalados localmente y pue
 - PyInstaller
 - Inno Setup
 
-## Probar en Windows
+## Probar la versión descargable
 
-### Opción de desarrollo
+La compilación de Windows se genera automáticamente mediante GitHub Actions. El paquete de prueba contiene:
+
+- instalador `RealTimeLocalTranslatorSetup-0.3.0.exe`;
+- versión portable;
+- modelos locales incluidos;
+- dependencias Python incluidas;
+- ejecutable sin consola.
+
+El instalador está pensado para Windows 10/11 de 64 bits.
+
+### Primera prueba
+
+1. Instala el `.exe`.
+2. Inicia **Real-Time Local Translator**.
+3. Selecciona el idioma destino.
+4. Reproduce un vídeo, música con voz, una reunión o cualquier audio por el dispositivo de salida predeterminado de Windows.
+5. Pulsa **Iniciar**.
+6. Espera unos segundos para que aparezca el primer segmento traducido.
+7. Pulsa **Detener** para finalizar.
+
+La aplicación no necesita Python instalado cuando se usa el instalador.
+
+### Desarrollo
+
+Para trabajar sobre el código:
 
 1. Instala Python 3.11.
-2. Descarga/clona el repositorio.
-3. Ejecuta scripts\\run_dev.bat.
-4. La primera preparación descarga el modelo Whisper y los paquetes Argos.
-5. Reproduce audio por los altavoces/auriculares de Windows.
-6. Ejecuta scripts\\diagnose_audio.py si quieres validar primero la captura.
-7. La aplicación se abre después de preparar los modelos.
+2. Ejecuta `scripts\\run_dev.bat`.
+3. La primera preparación descarga Whisper y los paquetes Argos.
+4. Reproduce audio por los altavoces/auriculares de Windows.
+5. Ejecuta `scripts\\diagnose_audio.py` si quieres comprobar la captura.
+6. La aplicación se abre después de preparar los modelos.
 
-La primera preparación puede tardar y ocupar varios cientos de MB. Después, el procesamiento no necesita conexión.
-
-### Crear el instalador
-
-En Windows, con las dependencias preparadas:
-
-powershell -ExecutionPolicy Bypass -File build\\build_windows.ps1
-
-Después abre installer\\RealTimeLocalTranslator.iss con Inno Setup para generar el instalador.
-
-El build copia los modelos locales dentro de la distribución. El objetivo es que el instalador final pueda ejecutarse sin Python instalado.
-
-## Estado de la versión 0.2.0
+## Estado de la versión 0.3.0 Preview
 
 - [x] Arquitectura por capas
 - [x] Captura Windows WASAPI loopback
@@ -67,12 +79,12 @@ El build copia los modelos locales dentro de la distribución. El objetivo es qu
 - [x] faster-whisper local
 - [x] Detección automática de idioma mediante Whisper
 - [x] Argos Translate local
-- [x] Paquetes Argos portables dentro de models/argos
+- [x] Paquetes Argos portables dentro de `models/argos`
 - [x] Segmentación por silencio
 - [x] Límite de duración/buffer
 - [x] Errores aislados por segmento
-- [x] Interfaz PySide6 inicial
-- [x] Build PyInstaller
+- [x] Inicialización de motores fuera del hilo GUI
+- [x] Build PyInstaller reproducible
 - [x] Instalador Inno Setup
 - [x] Build automatizado de Windows mediante GitHub Actions
 - [ ] Validación real de WASAPI en hardware Windows
@@ -83,7 +95,7 @@ El build copia los modelos locales dentro de la distribución. El objetivo es qu
 - [ ] Pulido visual y accesibilidad
 - [ ] Firma digital del instalador
 
-**Importante:** esta versión ya tiene una ruta de construcción para obtener un ejecutable de Windows, pero no debe considerarse una versión final hasta probar captura, ASR y traducción en un Windows real.
+**Importante:** la Preview está preparada para la primera prueba de hardware, pero la captura WASAPI y el rendimiento real deben validarse en el PC del usuario. No se debe considerar una versión final hasta completar esa validación.
 
 ## Privacidad
 
