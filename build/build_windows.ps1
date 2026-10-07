@@ -1,4 +1,1 @@
-$ErrorActionPreference = "Stop"
-if (-not (Test-Path ".venv\Scripts\python.exe")) { throw "Create .venv and install requirements first." }
-& ".\.venv\Scripts\python.exe" -m pip install pyinstaller
-& ".\.venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --name RealTimeLocalTranslator --windowed main.py
+$ErrorActionPreference = "Stop"\n\nif (-not (Test-Path ".venv\Scripts\python.exe")) {\n    throw "Create .venv and install requirements first."\n}\n\n& ".\.venv\Scripts\python.exe" -m pip install --upgrade pyinstaller\n\nif (-not (Test-Path "models\whisper\small\model.bin")) {\n    Write-Host "Local models are missing. Preparing them first..."\n    & ".\.venv\Scripts\python.exe" scripts\prepare_local_models.py\n}\n\n$pyinstallerArgs = @(\n    "--noconfirm",\n    "--clean",\n    "--windowed",\n    "--name", "RealTimeLocalTranslator",\n    "--add-data", "models;models",\n    "main.py"\n)\n& ".\.venv\Scripts\python.exe" -m PyInstaller @pyinstallerArgs\n\nWrite-Host "Build complete: dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"\n
