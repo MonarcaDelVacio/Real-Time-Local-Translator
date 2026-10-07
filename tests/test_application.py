@@ -1,6 +1,7 @@
 from app.application.bootstrap import build_application
 
 
-def test_application_bootstrap_builds_local_pipeline() -> None:
+def test_application_bootstrap_is_lazy() -> None:
     application = build_application()
-    assert application.pipeline is not None
+    assert application.pipeline is None
+    assert application._pipeline_factory is not None
