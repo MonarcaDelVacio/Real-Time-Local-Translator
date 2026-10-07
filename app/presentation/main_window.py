@@ -55,7 +55,7 @@ def run_gui(application) -> int:
 
     app = QApplication.instance() or QApplication([])
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator")
+    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.0")
     window.resize(1000, 700)
 
     central = QWidget()
@@ -66,17 +66,14 @@ def run_gui(application) -> int:
     status = QLabel("Listo — procesamiento local")
 
     target = QComboBox()
-    languages = [
-        ("Español", "es"), ("English", "en"), ("Português", "pt"),
-        ("Français", "fr"), ("Deutsch", "de"), ("Italiano", "it"),
-        ("日本語", "ja"), ("한국어", "ko"), ("中文", "zh"),
-    ]
-    for name, code in languages:
-        target.addItem(name, code)
+    target.addItem("Español", "es")
+    target.addItem("English", "en")
 
     output = QPlainTextEdit()
     output.setReadOnly(True)
-    output.setPlaceholderText("Las traducciones aparecerán aquí…")
+    output.setPlaceholderText(
+        "Reproduce una voz por los altavoces/auriculares de Windows y pulsa Iniciar…"
+    )
 
     start = QPushButton("Iniciar")
     stop = QPushButton("Detener")
@@ -91,12 +88,21 @@ def run_gui(application) -> int:
     row.addWidget(clear)
 
     layout.addWidget(title)
+    layout.addWidget(
+        QLabel("Preview: traducción local Inglés ↔ Español")
+    )
     layout.addWidget(status)
     layout.addLayout(row)
     layout.addWidget(output)
     window.setCentralWidget(central)
 
     worker = None
+
+    def finish_session():
+        status.setText("Detenido")
+        start.setEnabled(True)
+        stop.setEnabled(False)
+        target.setEnabled(True)
 
     def start_session():
         nonlocal worker
@@ -106,13 +112,12 @@ def run_gui(application) -> int:
         worker = Worker(application, target.currentData())
         worker.translated.connect(
             lambda lang, translated, source: output.appendPlainText(
-                f"[{lang} → {target.currentData()}]\n"
-                f"{translated}\n"
+                f"[{lang} → {target.currentData()}]\n{translated}\n"
             )
         )
         worker.status_changed.connect(status.setText)
         worker.failed.connect(lambda error: status.setText(f"Error: {error}"))
-        worker.finished_cleanly.connect(lambda: finish_session())
+        worker.finished_cleanly.connect(finish_session)
         worker.start()
 
         start.setEnabled(False)
@@ -129,15 +134,7 @@ def run_gui(application) -> int:
                     "Cierre pendiente",
                     "El motor todavía está finalizando la captura. Espera unos segundos.",
                 )
-        start.setEnabled(True)
-        stop.setEnabled(False)
-        target.setEnabled(True)
-
-    def finish_session():
-        status.setText("Detenido")
-        start.setEnabled(True)
-        stop.setEnabled(False)
-        target.setEnabled(True)
+        finish_session()
 
     def clear_output():
         output.clear()
