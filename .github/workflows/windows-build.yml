@@ -1,0 +1,54 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          py -3.11 -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
+          .\.venv\Scripts\python.exe -m pip install pyinstaller
+
+      - name: Prepare local models
+        shell: pwsh
+        run: .\.venv\Scripts\python.exe scripts\prepare_local_models.py
+
+      - name: Run tests
+        shell: pwsh
+        run: .\.venv\Scripts\python.exe -m pytest
+
+      - name: Build application
+        shell: pwsh
+        run: .\build\build_windows.ps1
+
+      - name: Build installer
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\RealTimeLocalTranslator.iss'
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: RealTimeLocalTranslator-Windows
+          path: |
+            Output\RealTimeLocalTranslatorSetup.exe
+            dist\RealTimeLocalTranslator\*
+          if-no-files-found: error
+          retention-days: 14
