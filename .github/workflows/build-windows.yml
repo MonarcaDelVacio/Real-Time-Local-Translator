@@ -42,6 +42,12 @@ jobs:
         shell: powershell
         run: choco install innosetup --no-progress -y
 
+      - name: Download Microsoft Visual C++ runtime
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force redist | Out-Null
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "redist/vc_redist.x64.exe"
+
       - name: Build installer
         shell: powershell
         run: |
