@@ -1,1 +1,6 @@
-# Runtime dependencies will be pinned here after Phase 0 validation.
+# Runtime dependencies. Processing is local/offline after installation.
+faster-whisper>=1.2,<2
+argostranslate>=1.10,<2
+soundcard>=0.4.6,<0.5
+numpy>=1.26,<3
+PySide6>=6.8,<7
