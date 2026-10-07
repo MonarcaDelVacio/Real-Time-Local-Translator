@@ -86,7 +86,21 @@ if errorlevel 1 (
 echo [OK] Runtime imports verified.
 echo.
 
-echo [5/5] Starting Real-Time Local Translator...
+echo [5/5] Preparing local AI models if necessary...
+echo.
+if not exist "models\whisper\base\model.bin" (
+    echo [INFO] Whisper model not found. Running local model preparation...
+    "%VENV_PY%" "scripts\prepare_local_models.py"
+    if errorlevel 1 (
+        echo [ERROR] Local AI model preparation failed.
+        goto :FAIL
+    )
+    echo [OK] Local AI models prepared.
+) else (
+    echo [OK] Local Whisper model found.
+)
+echo.
+echo Starting Real-Time Local Translator...
 echo.
 echo ------------------------------------------------------------
 echo   IMPORTANT
