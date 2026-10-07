@@ -17,11 +17,11 @@ Capturar el audio que reproduce el PC, detectar automáticamente el idioma habla
 
 Windows system audio → WASAPI Loopback → VAD → faster-whisper → idioma detectado → Argos Translate → PySide6
 
-faster-whisper permite cargar un modelo CTranslate2 desde un directorio local y ejecutar con 'local_files_only=True'; esto evita descargas durante el uso normal. citeturn3search0turn3search2
+faster-whisper permite cargar un modelo CTranslate2 desde un directorio local y ejecutar con 'local_files_only=True'; esto evita descargas durante el uso normal.
 
-SoundCard proporciona captura de loopback para Windows. citeturn0search0
+SoundCard proporciona captura de loopback para Windows.
 
-Argos Translate funciona con paquetes de traducción instalados localmente y puede encadenar idiomas intermedios cuando existen los paquetes necesarios. citeturn1search0turn1search4
+Argos Translate funciona con paquetes de traducción instalados localmente y puede encadenar idiomas intermedios cuando existen los paquetes necesarios.
 
 ## Tecnologías
 
