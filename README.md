@@ -10,9 +10,9 @@ Capturar el audio que reproduce el PC, detectar automáticamente el idioma habla
 
 - **Gratis y local:** no requiere API de pago, cuenta, suscripción, créditos ni servidor externo.
 - **Offline durante el uso:** la compilación distribuida incluye los modelos locales preparados; no necesita Internet para transcribir o traducir.
-- **Audio del sistema:** utiliza Windows WASAPI Loopback mediante SoundCard, por lo que puede capturar Zoom, Meet, Teams, Discord, navegador y otras aplicaciones que reproduzcan audio.
+- **Audio del sistema:** utiliza Windows WASAPI Loopback mediante SoundCard.
 - **Arquitectura reemplazable:** los motores están aislados detrás de contratos de dominio.
-- **Interfaz sin bloqueo:** Whisper y la captura se inicializan en un hilo de trabajo, no en el hilo de la interfaz.
+- **Interfaz sin bloqueo:** Whisper y la captura se inicializan en un hilo de trabajo.
 
 ## Arquitectura
 
@@ -22,7 +22,7 @@ faster-whisper puede cargar un modelo CTranslate2 desde un directorio local y us
 
 SoundCard proporciona captura de loopback para Windows.
 
-Argos Translate usa paquetes de traducción instalados localmente y puede utilizar idiomas intermedios cuando existen los paquetes necesarios.
+Argos Translate usa paquetes de traducción instalados localmente y permite utilizar idiomas intermedios cuando existen los paquetes necesarios.
 
 ## Tecnologías
 
@@ -36,42 +36,55 @@ Argos Translate usa paquetes de traducción instalados localmente y puede utiliz
 - PyInstaller
 - Inno Setup
 
+## Preview 0.3.0
+
+La primera compilación descargable está enfocada en una validación completa y manejable del circuito:
+
+**Inglés ↔ Español**
+
+Incluye:
+
+- modelo Whisper `base` multilingüe;
+- detección automática del idioma mediante Whisper;
+- traducción local Inglés → Español;
+- traducción local Español → Inglés;
+- captura del audio de salida de Windows;
+- instalador Windows x64;
+- Python y dependencias incluidos;
+- modelos incluidos;
+- funcionamiento sin Internet después de la instalación.
+
+La selección de más idiomas se ampliará después de validar correctamente audio, latencia, consumo y estabilidad en hardware Windows real.
+
 ## Probar la versión descargable
 
-La compilación de Windows se genera automáticamente mediante GitHub Actions. El paquete de prueba contiene:
+La compilación Windows se genera mediante GitHub Actions. El instalador resultante es:
 
-- instalador `RealTimeLocalTranslatorSetup-0.3.0.exe`;
-- versión portable;
-- modelos locales incluidos;
-- dependencias Python incluidas;
-- ejecutable sin consola.
+`RealTimeLocalTranslatorSetup-0.3.0.exe`
 
-El instalador está pensado para Windows 10/11 de 64 bits.
+El instalador no requiere Python.
 
 ### Primera prueba
 
 1. Instala el `.exe`.
 2. Inicia **Real-Time Local Translator**.
-3. Selecciona el idioma destino.
-4. Reproduce un vídeo, música con voz, una reunión o cualquier audio por el dispositivo de salida predeterminado de Windows.
+3. Selecciona **Español** como destino.
+4. Reproduce una voz en inglés por los altavoces/auriculares de Windows.
 5. Pulsa **Iniciar**.
-6. Espera unos segundos para que aparezca el primer segmento traducido.
-7. Pulsa **Detener** para finalizar.
+6. Espera unos segundos para que aparezca el primer segmento.
+7. Pulsa **Detener**.
 
-La aplicación no necesita Python instalado cuando se usa el instalador.
+Después puedes probar el recorrido contrario seleccionando **English** y reproduciendo español.
 
-### Desarrollo
-
-Para trabajar sobre el código:
+## Desarrollo
 
 1. Instala Python 3.11.
 2. Ejecuta `scripts\\run_dev.bat`.
-3. La primera preparación descarga Whisper y los paquetes Argos.
-4. Reproduce audio por los altavoces/auriculares de Windows.
-5. Ejecuta `scripts\\diagnose_audio.py` si quieres comprobar la captura.
-6. La aplicación se abre después de preparar los modelos.
+3. La preparación descarga el modelo Whisper y los paquetes Argos necesarios.
+4. Reproduce audio por los altavoces/auriculares.
+5. Ejecuta `scripts\\diagnose_audio.py` si quieres comprobar primero la captura.
 
-## Estado de la versión 0.3.0 Preview
+## Estado
 
 - [x] Arquitectura por capas
 - [x] Captura Windows WASAPI loopback
@@ -79,28 +92,28 @@ Para trabajar sobre el código:
 - [x] faster-whisper local
 - [x] Detección automática de idioma mediante Whisper
 - [x] Argos Translate local
-- [x] Paquetes Argos portables dentro de `models/argos`
+- [x] Paquetes Argos portables
 - [x] Segmentación por silencio
 - [x] Límite de duración/buffer
 - [x] Errores aislados por segmento
 - [x] Inicialización de motores fuera del hilo GUI
 - [x] Build PyInstaller reproducible
 - [x] Instalador Inno Setup
-- [x] Build automatizado de Windows mediante GitHub Actions
+- [x] Build automatizado de Windows
 - [ ] Validación real de WASAPI en hardware Windows
-- [ ] Medición de latencia y rendimiento en equipos modestos
-- [ ] VAD neuronal de mejor calidad
+- [ ] Medición de latencia y rendimiento
+- [ ] VAD neuronal
 - [ ] Historial de sesiones
-- [ ] Configuración avanzada de dispositivo/modelo
-- [ ] Pulido visual y accesibilidad
-- [ ] Firma digital del instalador
+- [ ] Selector avanzado de dispositivo
+- [ ] Ampliación de idiomas
+- [ ] Firma digital
 
-**Importante:** la Preview está preparada para la primera prueba de hardware, pero la captura WASAPI y el rendimiento real deben validarse en el PC del usuario. No se debe considerar una versión final hasta completar esa validación.
+**Importante:** la Preview está preparada para la primera prueba de hardware, pero no se considera versión final hasta comprobar captura, ASR, traducción y estabilidad en Windows real.
 
 ## Privacidad
 
-El audio de las reuniones no se envía a un proveedor externo. Los modelos y paquetes se procesan localmente. Los datos de ejecución, logs y grabaciones de diagnóstico no se incluyen en Git.
+El audio no se envía a un proveedor externo. Los modelos y paquetes se procesan localmente.
 
 ## Licencia
 
-MIT para el código de este proyecto. Las licencias de modelos y dependencias de terceros deben revisarse antes de redistribuir una versión comercial o pública.
+MIT para el código del proyecto. Las licencias de modelos y dependencias de terceros deben revisarse antes de una distribución comercial.
