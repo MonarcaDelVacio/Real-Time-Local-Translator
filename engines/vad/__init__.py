@@ -1,1 +1,3 @@
-"""Voice activity detection adapters."""
+from .energy import EnergyVoiceActivityDetector
+
+__all__ = ["EnergyVoiceActivityDetector"]
