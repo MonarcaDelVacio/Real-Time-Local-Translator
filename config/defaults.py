@@ -1,0 +1,5 @@
+"""Application defaults independent of the GUI."""
+DEFAULT_SOURCE_LANGUAGE = "auto"
+DEFAULT_TARGET_LANGUAGE = "es"
+DEFAULT_SAMPLE_RATE = 16000
+DEFAULT_CHANNELS = 1
