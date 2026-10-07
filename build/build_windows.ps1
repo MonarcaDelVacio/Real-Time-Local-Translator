@@ -4,7 +4,7 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
     throw "Create .venv and install requirements first."
 }
 
-if (-not (Test-Path "models\whisper\small\model.bin")) {
+if (-not (Test-Path "models\whisper\base\model.bin")) {
     Write-Host "Local models are missing. Preparing them first..."
     & ".\.venv\Scripts\python.exe" scripts/prepare_local_models.py
     if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
