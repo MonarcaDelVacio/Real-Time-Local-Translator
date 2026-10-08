@@ -11,6 +11,7 @@ class TranscriptSegment:
     end: float
     language_code: str | None = None
     confidence: float | None = None
+    is_final: bool = True
 
 
 @dataclass(frozen=True, slots=True)
