@@ -27,16 +27,6 @@ jobs:
           .\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
           .\.venv\Scripts\python.exe -m pip install pyinstaller
 
-      - name: Cache local models
-        uses: actions/cache@v4
-        with:
-          path: models
-          key: windows-models-sherpa-${{ hashFiles('config/defaults.py', 'scripts/prepare_streaming_models.py') }}
-
-      - name: Prepare local models
-        shell: pwsh
-        run: .\.venv\Scripts\python.exe scripts\prepare_streaming_models.py
-
       - name: Run tests
         shell: pwsh
         run: .\.venv\Scripts\python.exe -m pytest
