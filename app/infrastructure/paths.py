@@ -1,29 +1,37 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import sys
 
 
 def project_root() -> Path:
-    """Return the application directory, or the repository root during development."""
+    """Return the application directory during development or installation."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[2]
 
 
 def models_root() -> Path:
-    """Return the external model directory, with legacy bundled-model fallback."""
+    """Return the writable runtime model directory.
+
+    Installed builds keep downloaded models in LOCALAPPDATA so the application
+    can repair/update them without requiring administrator privileges.
+    Developer builds continue to use the repository's models directory.
+    """
+    override = os.environ.get("RTL_MODELS_DIR")
+    if override:
+        return Path(override)
+    if getattr(sys, "frozen", False):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data) / "Real-Time Local Translator" / "models"
     external = project_root() / "models"
     if external.exists():
         return external
-
-    # Builds before the external-model layout stored models under PyInstaller's
-    # internal directory. Keep this fallback so an update can reuse existing
-    # models without forcing the user to download them again.
     legacy = project_root() / "_internal" / "models"
     if legacy.exists():
         return legacy
-
     return external
 
 
