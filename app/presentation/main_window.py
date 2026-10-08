@@ -35,6 +35,7 @@ def run_gui(application) -> int:
             self.app = app
             self.target_language = target_language
             self.stop_flag = threading.Event()
+            self.error_message = None
 
         def run(self):
             try:
@@ -54,7 +55,8 @@ def run_gui(application) -> int:
                     lambda e: self.failed.emit(str(e)),
                 )
             except Exception as exc:
-                self.failed.emit(str(exc))
+                self.error_message = str(exc)
+                self.failed.emit(self.error_message)
             finally:
                 self.finished_cleanly.emit()
 
@@ -218,7 +220,6 @@ def run_gui(application) -> int:
         window.show()
 
     def finish_session():
-        status.setText("●  Detenido")
         initialization.setVisible(False)
         start.setEnabled(True)
         stop.setEnabled(False)
@@ -239,7 +240,20 @@ def run_gui(application) -> int:
         worker.status_changed.connect(lambda value: status.setText("●  " + value))
         worker.initialization_finished.connect(lambda: initialization.setVisible(False))
         worker.failed.connect(lambda error: status.setText(f"●  Error: {error}"))
-        worker.finished_cleanly.connect(finish_session)
+        def handle_worker_finished():
+            finish_session()
+            if worker is not None and worker.error_message:
+                status.setText(f"●  Error: {worker.error_message}")
+                QMessageBox.critical(
+                    window,
+                    "No se pudo iniciar",
+                    "La aplicación no pudo iniciar los motores locales.\n\n"
+                    + worker.error_message,
+                )
+            else:
+                status.setText("●  Detenido")
+
+        worker.finished_cleanly.connect(handle_worker_finished)
         worker.start()
         start.setEnabled(False)
         stop.setEnabled(True)
