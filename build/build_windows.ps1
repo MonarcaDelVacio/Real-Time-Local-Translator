@@ -1,3 +1,7 @@
+param(
+    [switch]$IncludeModels
+)
+
 $ErrorActionPreference = "Stop"
 
 $python = ".venv\Scripts\python.exe"
@@ -7,12 +11,18 @@ if (-not (Test-Path $python)) {
     throw "Missing .venv. Run run.bat once before building."
 }
 
-Write-Host "Preparing local model set if necessary..."
-if (-not (Test-Path "models\.ready") -or -not (Test-Path "models\whisper\small\model.bin")) {
-    & $python scripts/prepare_streaming_models.py
-    if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
+if ($IncludeModels) {
+    Write-Host "Preparing local model set for a self-contained build..."
+    if (-not (Test-Path "models\.ready") -or -not (Test-Path "models\whisper\small\model.bin")) {
+        & $python scripts/prepare_streaming_models.py
+        if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
+    } else {
+        Write-Host "Local model readiness marker found."
+    }
+    $env:RTL_BUNDLE_MODELS = "1"
 } else {
-    Write-Host "Local model readiness marker found."
+    Write-Host "Building without bundled models. The installed models directory will be reused."
+    Remove-Item Env:RTL_BUNDLE_MODELS -ErrorAction SilentlyContinue
 }
 
 Write-Host "Checking runtime imports..."
