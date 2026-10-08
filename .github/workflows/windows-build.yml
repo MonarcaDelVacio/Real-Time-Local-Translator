@@ -54,7 +54,7 @@ jobs:
         with:
           name: RealTimeLocalTranslator-Windows
           path: |
-            Output\RealTimeLocalTranslatorSetup.exe
-            dist\RealTimeLocalTranslator\*
+            dist\installer\*.exe
+            dist\installer\*.sha256
           if-no-files-found: error
           retention-days: 14
