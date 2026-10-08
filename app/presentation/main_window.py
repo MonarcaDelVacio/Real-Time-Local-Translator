@@ -377,18 +377,92 @@ def run_gui(application) -> int:
 
     window.show()
 
-    # Every installed build verifies its external model set before allowing a session.
-    # Missing/corrupt models are repaired into LOCALAPPDATA without administrator access.
+    # Check the external model set before enabling a session. A dedicated, always-on-top
+    # window appears only when something must be downloaded or repaired.
     from app.infrastructure.model_manager import models_ready
     setup_worker = None
     if not models_ready():
         start.setEnabled(False)
-        status.setText("●  Verificando modelos y dependencias locales…")
+        status.setText("●  Preparando modelos y dependencias locales…")
+
+        setup_dialog = QDialog(window)
+        setup_dialog.setWindowTitle("Preparación inicial")
+        setup_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        setup_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        setup_dialog.setMinimumWidth(520)
+        setup_dialog.resize(560, 270)
+        setup_dialog.setStyleSheet("""
+            QDialog { background: #111827; }
+            QLabel { color: #e5edf7; }
+            QLabel#setupTitle { color: #f8fafc; font-size: 19px; font-weight: 700; }
+            QLabel#setupNote { color: #94a3b8; }
+            QPushButton {
+                background: #2563eb; color: #ffffff; border: 1px solid #3b82f6;
+                border-radius: 7px; padding: 8px 18px; font-weight: 600;
+            }
+        """)
+        setup_layout = QVBoxLayout(setup_dialog)
+        setup_layout.setContentsMargins(24, 22, 24, 22)
+        setup_layout.setSpacing(12)
+
+        setup_title = QLabel("Preparando Real-Time Local Translator")
+        setup_title.setObjectName("setupTitle")
+        setup_layout.addWidget(setup_title)
+
+        setup_intro = QLabel(
+            "Faltan modelos o dependencias necesarios. Se descargarán y verificarán "
+            "antes de habilitar el botón «Iniciar»."
+        )
+        setup_intro.setWordWrap(True)
+        setup_layout.addWidget(setup_intro)
+
+        setup_stage = QLabel("Comprobando archivos locales…")
+        setup_stage.setObjectName("status")
+        setup_stage.setWordWrap(True)
+        setup_layout.addWidget(setup_stage)
+
+        setup_progress = QProgressBar()
+        setup_progress.setRange(0, 0)
+        setup_progress.setTextVisible(False)
+        setup_progress.setMinimumHeight(18)
+        setup_layout.addWidget(setup_progress)
+
+        setup_note = QLabel(
+            "Esta preparación normalmente solo se realiza la primera vez. "
+            "Se repetirá únicamente si después faltan archivos o se detectan incompletos."
+        )
+        setup_note.setObjectName("setupNote")
+        setup_note.setWordWrap(True)
+        setup_layout.addWidget(setup_note)
+
+        setup_button = QPushButton("Continuar")
+        setup_button.setVisible(False)
+        setup_button.clicked.connect(setup_dialog.accept)
+        setup_layout.addWidget(setup_button, 0, Qt.AlignmentFlag.AlignRight)
+
         setup_worker = ModelSetupWorker()
         window._setup_worker = setup_worker
-        setup_worker.status_changed.connect(lambda value: status.setText("●  " + value))
-        setup_worker.finished_ok.connect(lambda: (start.setEnabled(True), status.setText("●  Listo · modelos verificados")))
-        setup_worker.failed.connect(lambda error: (status.setText("●  Error al preparar modelos"), show_error_dialog("No se pudieron preparar los modelos", error)))
+        window._setup_dialog = setup_dialog
+        setup_worker.status_changed.connect(lambda value: (setup_stage.setText(value), status.setText("●  " + value)))
+        def setup_finished():
+            setup_progress.setRange(0, 100)
+            setup_progress.setValue(100)
+            setup_stage.setText("¡Todo listo! La aplicación ya está preparada para usarse.")
+            setup_note.setText("Los modelos y las dependencias están instalados localmente. Pulsa «Continuar» y luego «Iniciar».")
+            setup_button.setVisible(True)
+            start.setEnabled(True)
+            status.setText("●  Listo · modelos verificados")
+        def setup_failed(error):
+            setup_progress.setVisible(False)
+            setup_stage.setText("No se pudo completar la preparación.")
+            setup_note.setText("Corrige el problema y vuelve a abrir la aplicación. Puedes copiar el mensaje de error para compartirlo.")
+            setup_button.setText("Cerrar")
+            setup_button.setVisible(True)
+            status.setText("●  Error al preparar modelos")
+            show_error_dialog("No se pudieron preparar los modelos", error)
+        setup_worker.finished_ok.connect(setup_finished)
+        setup_worker.failed.connect(setup_failed)
+        setup_dialog.show()
         setup_worker.start()
 
     return app.exec()
