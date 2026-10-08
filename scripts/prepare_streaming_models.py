@@ -69,7 +69,7 @@ def _extract(archive: Path, model_root: Path) -> Path:
             "Sherpa archive extracted successfully, but the expected ONNX files "
             "could not be found. Archive layout did not match the expected model."
         )
-    model_dir = model_root / MODEL
+    model_dir = model_root / EXTRACTED_DIR
     if found.resolve() != model_dir.resolve():
         if model_dir.exists():
             shutil.rmtree(model_dir)
