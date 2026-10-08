@@ -26,7 +26,7 @@ def _build_pipeline():
     from app.application.pipeline import TranslationPipeline
 
     root = project_root()
-    os.environ.setdefault("ARGOS_TRANSLATE_PACKAGES_DIR", str(root / "models" / "argos"))
+    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(root / "models" / "argos"))
     os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
 
     model_path = whisper_model_path(DEFAULT_ASR_MODEL)
