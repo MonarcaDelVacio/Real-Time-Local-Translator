@@ -8,7 +8,7 @@ if (-not (Test-Path $python)) {
 }
 
 Write-Host "Preparing local model set if necessary..."
-if (-not (Test-Path "models\.ready")) {
+if (-not (Test-Path "models\.ready") -or -not (Test-Path "models\whisper\small\model.bin")) {
     & $python scripts/prepare_streaming_models.py
     if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
 } else {
@@ -16,7 +16,7 @@ if (-not (Test-Path "models\.ready")) {
 }
 
 Write-Host "Checking runtime imports..."
-& $python -c "import PySide6, numpy, soundcard, sherpa_onnx, argostranslate; print('Runtime imports OK.')"
+& $python -c "import PySide6, numpy, soundcard, sherpa_onnx, faster_whisper, ctranslate2, argostranslate; print('Runtime imports OK.')"
 if ($LASTEXITCODE -ne 0) { throw "Runtime import check failed." }
 
 Write-Host "Installing/updating PyInstaller..."
