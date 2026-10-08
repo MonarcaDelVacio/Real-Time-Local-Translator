@@ -55,7 +55,7 @@ def run_gui(application) -> int:
 
     app = QApplication.instance() or QApplication([])
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.0")
+    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.1")
     window.resize(1000, 700)
 
     central = QWidget()
