@@ -36,7 +36,7 @@ def run_gui(application) -> int:
                 self.status_changed.emit("Cargando motores locales…")
                 pipe = self.app.create_pipeline()
                 pipe.target_language = self.target_language
-                self.status_changed.emit("Capturando audio del sistema…")
+                self.status_changed.emit("Capturando audio — ASR streaming…")
                 pipe.run(
                     lambda x: self.translated.emit(
                         x.source.language_code or "auto",
@@ -57,7 +57,7 @@ def run_gui(application) -> int:
 
     app = QApplication.instance() or QApplication([])
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.2")
+    window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.0")
     window.resize(1000, 700)
 
     central = QWidget()
@@ -120,6 +120,7 @@ def run_gui(application) -> int:
         def append_translation(lang, translated, source, is_final):
             target_code = target.currentData()
             if not is_final:
+                status.setText(f"En vivo: {translated}")
                 return
 
             if show_original.isChecked():
