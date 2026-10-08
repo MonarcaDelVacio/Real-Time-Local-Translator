@@ -1,19 +1,30 @@
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    throw "Create .venv and install requirements first."
+$python = ".venv\Scripts\python.exe"
+
+if (-not (Test-Path $python)) {
+    Write-Host "Local Python environment not found. Create it with run.bat first."
+    throw "Missing .venv. Run run.bat once before building."
 }
 
-if (-not (Test-Path "models\whisper\base\model.bin")) {
-    Write-Host "Local models are missing. Preparing them first..."
-    & ".\.venv\Scripts\python.exe" scripts/prepare_local_models.py
+Write-Host "Preparing local model set if necessary..."
+if (-not (Test-Path "models\.ready")) {
+    & $python scripts/prepare_local_models.py
     if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
+} else {
+    Write-Host "Local model readiness marker found."
 }
 
-& ".\.venv\Scripts\python.exe" -m pip install --upgrade pyinstaller
+Write-Host "Checking runtime imports..."
+& $python -c "import PySide6, numpy, soundcard, faster_whisper, argostranslate; print('Runtime imports OK.')"
+if ($LASTEXITCODE -ne 0) { throw "Runtime import check failed." }
+
+Write-Host "Installing/updating PyInstaller..."
+& $python -m pip install --upgrade pyinstaller
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller installation failed." }
 
-& ".\.venv\Scripts\python.exe" -m PyInstaller "build\RealTimeLocalTranslator.spec" --noconfirm --clean
+Write-Host "Building Windows application..."
+& $python -m PyInstaller "build\RealTimeLocalTranslator.spec" --noconfirm --clean
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 
 Write-Host "Build complete: dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"
