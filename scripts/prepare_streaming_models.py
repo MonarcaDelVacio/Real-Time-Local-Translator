@@ -6,6 +6,7 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = "nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11"
+WHISPER_MODEL = "Systran/faster-whisper-small"
 ARCHIVE_NAME = f"sherpa-onnx-{MODEL}.tar.bz2"
 URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
@@ -99,6 +100,14 @@ def main() -> None:
         raise RuntimeError("Sherpa streaming model is incomplete after extraction.")
 
     print("Sherpa model files validated.")
+    whisper_root = ROOT / "models" / "whisper" / "small"
+    if not (whisper_root / "model.bin").is_file():
+        print(f"Downloading local Whisper refinement model: {WHISPER_MODEL}...")
+        from huggingface_hub import snapshot_download
+        snapshot_download(repo_id=WHISPER_MODEL, local_dir=str(whisper_root))
+    if not (whisper_root / "model.bin").is_file():
+        raise RuntimeError("Whisper refinement model is incomplete after download.")
+    print("Whisper refinement model validated.")
     os.environ["ARGOS_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
     import argostranslate.package as package
 
