@@ -18,6 +18,12 @@ REQUIRED_NAMES = (
     "joiner.int8.onnx",
     "tokens.txt",
 )
+WHISPER_REQUIRED_NAMES = (
+    "config.json",
+    "model.bin",
+    "preprocessor_config.json",
+    "tokenizer.json",
+)
 
 
 def _required(directory: Path) -> list[Path]:
@@ -44,19 +50,9 @@ def _download(archive: Path) -> None:
         archive.unlink()
     subprocess.run(
         [
-            curl,
-            "--fail",
-            "--location",
-            "--retry",
-            "5",
-            "--retry-delay",
-            "5",
-            "--retry-all-errors",
-            "--continue-at",
-            "-",
-            "--output",
-            str(archive),
-            URL,
+            curl, "--fail", "--location", "--retry", "5",
+            "--retry-delay", "5", "--retry-all-errors",
+            "--continue-at", "-", "--output", str(archive), URL,
         ],
         check=True,
     )
@@ -98,16 +94,29 @@ def main() -> None:
 
     if not all(p.is_file() for p in _required(model_dir)):
         raise RuntimeError("Sherpa streaming model is incomplete after extraction.")
-
     print("Sherpa model files validated.")
+
     whisper_root = ROOT / "models" / "whisper" / "small"
-    if not (whisper_root / "model.bin").is_file():
-        print(f"Downloading local Whisper refinement model: {WHISPER_MODEL}...")
+    whisper_root.mkdir(parents=True, exist_ok=True)
+    if not all((whisper_root / name).is_file() for name in WHISPER_REQUIRED_NAMES):
+        print(f"Downloading complete local Whisper refinement model: {WHISPER_MODEL}...")
         from huggingface_hub import snapshot_download
-        snapshot_download(repo_id=WHISPER_MODEL, local_dir=str(whisper_root))
-    if not (whisper_root / "model.bin").is_file():
-        raise RuntimeError("Whisper refinement model is incomplete after download.")
+        snapshot_download(
+            repo_id=WHISPER_MODEL,
+            local_dir=str(whisper_root),
+            allow_patterns=list(WHISPER_REQUIRED_NAMES),
+        )
+    missing = [
+        name for name in WHISPER_REQUIRED_NAMES
+        if not (whisper_root / name).is_file()
+    ]
+    if missing:
+        raise RuntimeError(
+            "Whisper refinement model is incomplete after download; missing: "
+            + ", ".join(missing)
+        )
     print("Whisper refinement model validated.")
+
     os.environ["ARGOS_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
     import argostranslate.package as package
 
@@ -130,7 +139,8 @@ def main() -> None:
         package.install_from_path(match.download())
 
     (ROOT / "models" / ".ready").write_text(
-        "streaming models ready\n",
+        "streaming models ready
+",
         encoding="utf-8",
     )
     print("Local streaming models are ready.")
