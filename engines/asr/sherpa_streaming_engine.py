@@ -47,8 +47,10 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
             feature_dim=80,
             decoding_method="greedy_search",
             enable_endpoint_detection=True,
-            rule1_min_trailing_silence=0.8,
-            rule2_min_trailing_silence=0.45,
+            # Longer trailing silence gives the streaming decoder more time to
+            # finish a complete sentence instead of cutting it into fragments.
+            rule1_min_trailing_silence=2.4,
+            rule2_min_trailing_silence=1.2,
             rule3_min_utterance_length=20.0,
             provider=provider,
             debug=False,
@@ -56,6 +58,7 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
         self._stream = None
         self._last_text = ""
         self._utterance_started_at = 0.0
+        self._source_language = "auto"
 
     @staticmethod
     def _samples(chunk: AudioChunk) -> np.ndarray:
@@ -74,10 +77,23 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                 return str(value).split("-")[0].lower()
         return None
 
+    def set_source_language(self, language: str | None) -> None:
+        """Set the Nemotron prompt before creating the next stream."""
+        normalized = (language or "auto").strip().lower()
+        self._source_language = normalized or "auto"
+
     def start_stream(self) -> None:
         self._stream = self._recognizer.create_stream()
         self._last_text = ""
         self._utterance_started_at = 0.0
+
+        # Nemotron 3.5 supports an explicit per-stream language prompt.
+        # For the current English↔Spanish product, forcing the known source
+        # language avoids auto-detection errors from short/ambiguous chunks.
+        if self._source_language != "auto":
+            set_option = getattr(self._stream, "set_option", None)
+            if set_option is not None:
+                set_option("language", self._source_language)
 
     def _decode(self, chunk_timestamp: float) -> list[TranscriptSegment]:
         if self._stream is None:
@@ -98,7 +114,10 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                     text=text,
                     start=self._utterance_started_at,
                     end=chunk_timestamp,
-                    language_code=self._language(result),
+                    language_code=self._language(result) or (
+                        None if self._source_language == "auto"
+                        else self._source_language
+                    ),
                     confidence=None,
                     is_final=False,
                 )
@@ -121,12 +140,14 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                         text=text,
                         start=self._utterance_started_at or chunk.timestamp,
                         end=chunk.timestamp,
-                        language_code=self._language(result),
+                        language_code=self._language(result) or (
+                            None if self._source_language == "auto"
+                            else self._source_language
+                        ),
                         confidence=None,
                         is_final=True,
                     )
                 )
-                # Mark endpoint by resetting the stream after the final partial.
                 self._recognizer.reset(self._stream)
                 self._last_text = ""
                 self._utterance_started_at = 0.0
@@ -151,13 +172,16 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                 text=text,
                 start=self._utterance_started_at,
                 end=self._utterance_started_at,
-                language_code=self._language(result),
+                language_code=self._language(result) or (
+                    None if self._source_language == "auto"
+                    else self._source_language
+                ),
                 confidence=None,
+                is_final=True,
             )
         ]
 
     def transcribe(self, chunks: Iterable[AudioChunk]) -> Iterable[TranscriptSegment]:
-        """Compatibility path for deterministic callers."""
         self.start_stream()
         results: list[TranscriptSegment] = []
         for chunk in chunks:
