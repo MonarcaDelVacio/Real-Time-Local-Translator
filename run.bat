@@ -21,17 +21,15 @@ if not defined PYTHON_CMD (
 
 if not defined PYTHON_CMD (
     echo [ERROR] Python 3 was not found.
-    echo.
-    echo Install Python 3.11 or newer and make sure it is available
-    echo from the command line.
-    echo.
+    echo Install Python 3.11 or newer and make sure it is in PATH.
     goto :FAIL
 )
 
 echo [OK] Python command detected: %PYTHON_CMD%
+%PYTHON_CMD% --version
 echo.
 
-if not exist ".venv\Scripts\python.exe" (
+if not exist ".venvScriptspython.exe" (
     echo [1/5] Creating local Python environment...
     %PYTHON_CMD% -m venv ".venv"
     if errorlevel 1 (
@@ -44,7 +42,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 echo.
 
-set "VENV_PY=.venv\Scripts\python.exe"
+set "VENV_PY=.venvScriptspython.exe"
 
 echo [2/5] Checking Python environment...
 "%VENV_PY%" --version
@@ -56,19 +54,17 @@ echo [OK] Local Python environment works.
 echo.
 
 echo [3/5] Checking/installing application dependencies...
-echo First run may take a few minutes. Completed packages are reused.
+echo First run may take a few minutes. Already-installed packages are reused.
 echo.
 
-"%VENV_PY%" -m pip install -r "requirements\base.txt"
+"%VENV_PY%" -m pip install -r "requirementsase.txt"
 if errorlevel 1 (
     echo [ERROR] Runtime dependencies could not be installed.
-    echo.
-    echo The command above contains the detailed pip error.
     goto :FAIL
 )
 
 echo.
-echo [OK] Runtime dependencies installed.
+echo [OK] Runtime dependencies are ready.
 echo.
 
 echo [4/5] Checking local application imports...
@@ -80,28 +76,27 @@ if errorlevel 1 (
 echo [OK] Runtime imports verified.
 echo.
 
-echo [5/5] Preparing local AI models if necessary...
-echo.
-if not exist "models\whisper\base\model.bin" (
-    echo [INFO] Whisper model not found. Running local model preparation...
-    "%VENV_PY%" "scripts\prepare_local_models.py"
+echo [5/5] Checking local AI models...
+if not exist "models.ready" (
+    echo [INFO] Local model set is incomplete. Preparing it now...
+    "%VENV_PY%" "scriptsprepare_local_models.py"
     if errorlevel 1 (
         echo [ERROR] Local AI model preparation failed.
         goto :FAIL
     )
-    echo [OK] Local AI models prepared.
 ) else (
-    echo [OK] Local Whisper model found.
+    echo [OK] Local model readiness marker found.
 )
+
 echo.
 echo Starting Real-Time Local Translator...
 echo.
 echo ------------------------------------------------------------
 echo   IMPORTANT
-echo   - This console will remain open.
+echo   - This is the diagnostic launcher for the developer build.
+echo   - The console will remain open.
 echo   - Application errors will appear here.
-echo   - If the application crashes, copy the COMPLETE error
-echo     from this console and send it to the developer.
+echo   - If it crashes, send the COMPLETE console output.
 echo ------------------------------------------------------------
 echo.
 
