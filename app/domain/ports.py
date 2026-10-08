@@ -39,6 +39,16 @@ class StreamingASREngine(ASREngine):
     def finish_stream(self) -> Iterable[TranscriptSegment]: ...
 
 
+class ASRRefiner(ABC):
+    """Higher-accuracy offline pass used to correct completed streaming speech."""
+    @abstractmethod
+    def refine(
+        self,
+        chunks: Iterable[AudioChunk],
+        language_code: str,
+    ) -> Iterable[TranscriptSegment]: ...
+
+
 class LanguageDetector(ABC):
     @abstractmethod
     def detect(self, text: str) -> DetectedLanguage: ...
