@@ -1,7 +1,7 @@
 # Runtime dependencies. Processing is local/offline after installation.
 # Argos 1.11.1 keeps Stanza optional, avoiding the large PyTorch dependency.
 faster-whisper>=1.2,<2
-argostranslate>=1.11.1,<2
+argostranslate>=1.11.0,<2
 soundcard>=0.4.6,<0.5
 numpy>=1.26,<3
 # The application only needs Qt Essentials; the Addons bundle is unnecessary.
