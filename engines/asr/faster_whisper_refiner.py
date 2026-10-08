@@ -27,8 +27,8 @@ class FasterWhisperRefiner(ASRRefiner):
         required = (
             "config.json",
             "model.bin",
-            "preprocessor_config.json",
             "tokenizer.json",
+            "vocabulary.txt",
         )
         missing = [name for name in required if not (path / name).is_file()]
         if missing:
