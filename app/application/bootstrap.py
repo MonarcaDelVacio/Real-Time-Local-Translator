@@ -8,6 +8,7 @@ def _build_pipeline():
         DEFAULT_ASR_MODEL,
         DEFAULT_ASR_PROVIDER,
         DEFAULT_ASR_THREADS,
+        DEFAULT_ASR_MODEL,
         DEFAULT_AUDIO_BLOCK_FRAMES,
         DEFAULT_CHANNELS,
         DEFAULT_MAX_BUFFER_CHUNKS,
@@ -18,7 +19,10 @@ def _build_pipeline():
     )
     from app.application.pipeline import TranslationPipeline
     from app.infrastructure.paths import project_root
-    from engines.asr.sherpa_streaming_engine import SherpaNemotronStreamingASR
+    from engines.asr.sherpa_streaming_engine import (
+        FasterWhisperSmallRefiner,
+        SherpaNemotronStreamingASR,
+    )
     from engines.audio.soundcard_backend import SoundCardSystemAudioSource
     from engines.translation.argos_engine import ArgosTranslationEngine
     from engines.vad.energy import EnergyVoiceActivityDetector
@@ -36,6 +40,11 @@ def _build_pipeline():
         provider=DEFAULT_ASR_PROVIDER,
         local_only=True,
     )
+    refiner = FasterWhisperSmallRefiner(
+        str(root / "models" / "whisper" / "small"),
+        cpu_threads=DEFAULT_ASR_THREADS,
+        local_only=True,
+    )
     return TranslationPipeline(
         source,
         EnergyVoiceActivityDetector(),
@@ -45,6 +54,7 @@ def _build_pipeline():
         silence_chunks=DEFAULT_SILENCE_CHUNKS,
         max_utterance_seconds=DEFAULT_MAX_UTTERANCE_SECONDS,
         max_buffer_chunks=DEFAULT_MAX_BUFFER_CHUNKS,
+        refiner=refiner,
     )
 
 
