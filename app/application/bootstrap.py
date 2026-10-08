@@ -17,28 +17,28 @@ def _build_pipeline():
         DEFAULT_TARGET_LANGUAGE,
     )
     from app.application.pipeline import TranslationPipeline
-    from app.infrastructure.paths import project_root
+    from app.infrastructure.paths import models_root
     from engines.asr.faster_whisper_refiner import FasterWhisperRefiner
     from engines.asr.sherpa_streaming_engine import SherpaNemotronStreamingASR
     from engines.audio.soundcard_backend import SoundCardSystemAudioSource
     from engines.translation.argos_engine import ArgosTranslationEngine
     from engines.vad.energy import EnergyVoiceActivityDetector
 
-    root = project_root()
-    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(root / "models" / "argos"))
+    root = models_root()
+    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(root / "argos"))
     os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
 
     source = SoundCardSystemAudioSource(
         DEFAULT_SAMPLE_RATE, DEFAULT_CHANNELS, DEFAULT_AUDIO_BLOCK_FRAMES
     )
     asr = SherpaNemotronStreamingASR(
-        str(root / "models" / "sherpa" / DEFAULT_ASR_MODEL),
+        str(root / "sherpa" / DEFAULT_ASR_MODEL),
         num_threads=DEFAULT_ASR_THREADS,
         provider=DEFAULT_ASR_PROVIDER,
         local_only=True,
     )
     refiner = FasterWhisperRefiner(
-        str(root / "models" / "whisper" / "small"),
+        str(root / "whisper" / "small"),
         num_threads=DEFAULT_ASR_THREADS,
         local_only=True,
     )
