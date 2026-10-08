@@ -15,7 +15,7 @@ SHERPA_URL = (
     f"asr-models/{SHERPA_ARCHIVE}"
 )
 SHERPA_REQUIRED = ("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
-WHISPER_REQUIRED = ("config.json", "model.bin", "preprocessor_config.json", "tokenizer.json")
+WHISPER_REQUIRED = ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt")
 ARGOS_REQUIRED = (("en", "es"), ("es", "en"))
 
 
