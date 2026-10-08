@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from datetime import datetime
 
 from app.domain.models import AudioChunk, TranslationSegment, TranscriptSegment
 from app.domain.ports import (
@@ -173,7 +174,7 @@ class TranslationPipeline:
                                 source=segment,
                                 translated_text=segment.text,
                                 target_language_code=segment.language_code or source_language,
-                                created_at=segment.end,
+                                created_at=datetime.now(),
                             )
                         )
 
