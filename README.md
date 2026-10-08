@@ -36,7 +36,7 @@ Argos Translate usa paquetes de traducción instalados localmente y permite util
 - PyInstaller
 - Inno Setup
 
-## Preview 0.3.0
+## Preview 0.3.1
 
 La primera compilación descargable está enfocada en una validación completa y manejable del circuito:
 
@@ -60,7 +60,7 @@ La selección de más idiomas se ampliará después de validar correctamente aud
 
 La compilación Windows se genera mediante GitHub Actions. El instalador resultante es:
 
-`RealTimeLocalTranslatorSetup-0.3.0.exe`
+`RealTimeLocalTranslatorSetup-0.3.1.exe`
 
 El instalador no requiere Python.
 
