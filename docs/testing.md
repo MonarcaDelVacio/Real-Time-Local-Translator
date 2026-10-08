@@ -1,4 +1,4 @@
-# Windows test procedure — Preview 0.3.0
+# Windows test procedure — Preview 0.3.1
 
 ## Objetivo
 
