@@ -6,7 +6,7 @@ Validar el circuito completo sobre Windows real.
 
 ## 1. Instalar
 
-Usa `RealTimeLocalTranslatorSetup-0.3.0.exe`.
+Usa `RealTimeLocalTranslatorSetup-0.3.1.exe`.
 
 No necesitas instalar Python.
 
