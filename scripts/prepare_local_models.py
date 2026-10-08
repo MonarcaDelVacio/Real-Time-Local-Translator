@@ -26,7 +26,7 @@ TRANSLATION_PAIRS = [
 def main() -> int:
     try:
         # Keep Argos model data inside the project for portable/offline use.
-        os.environ["ARGOS_TRANSLATE_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
+        os.environ["ARGOS_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
         from config.defaults import (
             DEFAULT_ASR_COMPUTE_TYPE,
             DEFAULT_ASR_DEVICE,
