@@ -49,8 +49,8 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
             enable_endpoint_detection=True,
             # Longer trailing silence gives the streaming decoder more time to
             # finish a complete sentence instead of cutting it into fragments.
-            rule1_min_trailing_silence=2.4,
-            rule2_min_trailing_silence=1.2,
+            rule1_min_trailing_silence=1.4,
+            rule2_min_trailing_silence=0.75,
             rule3_min_utterance_length=20.0,
             provider=provider,
             debug=False,
