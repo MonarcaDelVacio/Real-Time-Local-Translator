@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections.abc import Callable, Iterable
 
-from app.domain.models import AudioChunk, TranslationSegment
-from app.domain.ports import ASREngine, AudioSource, TranslationEngine, VoiceActivityDetector
+from app.domain.models import AudioChunk, TranslationSegment, TranscriptSegment
+from app.domain.ports import (
+    ASREngine,
+    AudioSource,
+    StreamingASREngine,
+    TranslationEngine,
+    VoiceActivityDetector,
+)
 
 
 class TranslationPipeline:
-    """Turns system-audio chunks into translated utterance events.
-
-    Audio capture is kept separate from the CPU-heavy ASR/translation work.
-    This prevents the microphone/system-audio reader from stopping while
-    Whisper is processing a previous utterance.
-    """
+    """Translate either chunked offline ASR or true streaming ASR."""
 
     def __init__(
         self,
@@ -23,8 +23,8 @@ class TranslationPipeline:
         translator: TranslationEngine,
         target_language: str = "es",
         silence_chunks: int = 4,
-        max_utterance_seconds: float = 7.0,
-        max_buffer_chunks: int = 160,
+        max_utterance_seconds: float = 20.0,
+        max_buffer_chunks: int = 400,
     ) -> None:
         if silence_chunks < 1 or max_utterance_seconds <= 0 or max_buffer_chunks < 1:
             raise ValueError("Invalid pipeline limits")
@@ -43,9 +43,8 @@ class TranslationPipeline:
         if not self._speech:
             return 0.0
         first = self._speech[0]
-        bytes_per_sample = 4
         frames = sum(len(c.samples) for c in self._speech) / (
-            bytes_per_sample * max(1, first.channels)
+            4 * max(1, first.channels)
         )
         return frames / max(1, first.sample_rate)
 
@@ -64,14 +63,45 @@ class TranslationPipeline:
             ):
                 return self._take_speech()
             return None
-
         if not self._speech:
             return None
-
         self._silence += 1
         if self._silence < self.silence_chunks:
             return None
         return self._take_speech()
+
+    def _resolve_language(self, segment: TranscriptSegment) -> TranscriptSegment:
+        if segment.language_code:
+            return segment
+        fallback = "en" if self.target_language == "es" else "es"
+        return TranscriptSegment(
+            segment.text,
+            segment.start,
+            segment.end,
+            fallback,
+            segment.confidence,
+            segment.is_final,
+        )
+
+    def _translate_segments(
+        self,
+        segments: Iterable[TranscriptSegment],
+        on_translation: Callable[[TranslationSegment], None],
+        on_error: Callable[[Exception], None] | None,
+    ) -> None:
+        for segment in segments:
+            if not segment.text.strip():
+                continue
+            try:
+                translated = self.translator.translate(
+                    self._resolve_language(segment), self.target_language
+                )
+                on_translation(translated)
+            except Exception as exc:
+                if on_error is not None:
+                    on_error(exc)
+                else:
+                    raise
 
     def _translate_chunks(
         self,
@@ -80,22 +110,11 @@ class TranslationPipeline:
     ) -> list[TranslationSegment]:
         if not chunks:
             return []
-
         results: list[TranslationSegment] = []
         try:
-            segments = self.asr.transcribe(chunks)
-            for segment in segments:
-                if not segment.text.strip():
-                    continue
-                try:
-                    results.append(
-                        self.translator.translate(segment, self.target_language)
-                    )
-                except Exception as exc:
-                    if on_error is not None:
-                        on_error(exc)
-                    else:
-                        raise
+            self._translate_segments(
+                self.asr.transcribe(chunks), results.append, on_error
+            )
         except Exception as exc:
             if on_error is not None:
                 on_error(exc)
@@ -104,7 +123,6 @@ class TranslationPipeline:
         return results
 
     def process_chunk(self, chunk: AudioChunk) -> list[TranslationSegment]:
-        """Process one chunk synchronously; kept for deterministic unit tests."""
         ready = self._collect_utterance(chunk)
         if ready is None:
             return []
@@ -116,15 +134,25 @@ class TranslationPipeline:
     ) -> list[TranslationSegment]:
         return self._translate_chunks(self._take_speech(), on_error)
 
-    @staticmethod
-    def _deliver_future(
-        future: Future[list[TranslationSegment]],
+    def _run_streaming(
+        self,
         on_translation: Callable[[TranslationSegment], None],
+        stop_requested: Callable[[], bool],
         on_error: Callable[[Exception], None] | None,
     ) -> None:
+        engine = self.asr
+        if not isinstance(engine, StreamingASREngine):
+            raise TypeError("Streaming pipeline requires a streaming ASR engine")
+        engine.start_stream()
         try:
-            for result in future.result():
-                on_translation(result)
+            while not stop_requested():
+                chunk = self.source.read()
+                self._translate_segments(
+                    engine.accept_audio(chunk), on_translation, on_error
+                )
+            self._translate_segments(
+                engine.finish_stream(), on_translation, on_error
+            )
         except Exception as exc:
             if on_error is not None:
                 on_error(exc)
@@ -138,44 +166,27 @@ class TranslationPipeline:
         on_error: Callable[[Exception], None] | None = None,
     ) -> None:
         self.source.start()
-        futures: list[Future[list[TranslationSegment]]] = []
+        try:
+            if isinstance(self.asr, StreamingASREngine):
+                self._run_streaming(on_translation, stop_requested, on_error)
+                return
 
-        # One worker is intentional: ASR remains ordered and does not compete
-        # with itself for all CPU cores, while capture continues uninterrupted.
-        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="translator") as executor:
-            try:
-                while not stop_requested():
-                    try:
-                        chunk = self.source.read()
-                        ready = self._collect_utterance(chunk)
-                        if ready is not None:
-                            future = executor.submit(
-                                self._translate_chunks, ready, on_error
-                            )
-                            future.add_done_callback(
-                                lambda f: self._deliver_future(
-                                    f, on_translation, on_error
-                                )
-                            )
-                            futures.append(future)
-                    except Exception as exc:
-                        if on_error is not None:
-                            on_error(exc)
-                        else:
-                            raise
+            while not stop_requested():
+                try:
+                    chunk = self.source.read()
+                    ready = self._collect_utterance(chunk)
+                    if ready is not None:
+                        for result in self._translate_chunks(ready, on_error):
+                            on_translation(result)
+                except Exception as exc:
+                    if on_error is not None:
+                        on_error(exc)
+                    else:
+                        raise
 
-                ready = self._take_speech()
-                if ready:
-                    future = executor.submit(self._translate_chunks, ready, on_error)
-                    future.add_done_callback(
-                        lambda f: self._deliver_future(f, on_translation, on_error)
-                    )
-                    futures.append(future)
-
-                # Wait for all queued utterances before the worker thread exits.
-                for future in futures:
-                    future.result()
-            finally:
-                self.source.stop()
-                self._speech.clear()
-                self._silence = 0
+            for result in self._translate_chunks(self._take_speech(), on_error):
+                on_translation(result)
+        finally:
+            self.source.stop()
+            self._speech.clear()
+            self._silence = 0
