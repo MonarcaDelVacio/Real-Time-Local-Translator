@@ -124,3 +124,7 @@ MIT para el código del proyecto. Las licencias de modelos y dependencias de ter
 ## Experimental 0.4.1 quality pass
 
 This branch uses stabilized streaming translation: partial ASR is not sent to the translator, the source language is forced for the current English↔Spanish mode, and the Nemotron 1120 ms profile is used for additional look-ahead context.
+
+## Experimental 0.4.2 accuracy pass
+
+The streaming path now uses a two-stage ASR design: Nemotron provides immediate live transcription, while each completed utterance is re-transcribed locally with Whisper Small before translation. This second pass is intended to recover words missed or misrecognized during fast speech. Endpoint timing was also tightened so natural pauses are recognized sooner without translating unstable partial hypotheses.
