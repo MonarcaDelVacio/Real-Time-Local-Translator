@@ -1,0 +1,856 @@
+# PROYECTO: Real-Time Local Translator
+
+## 1. OBJETIVO GENERAL
+
+Desarrollar una aplicación de escritorio para Windows capaz de escuchar audio de reuniones, clases, llamadas, vídeos u otras fuentes de audio del PC, transcribirlo en tiempo real, detectar automáticamente el idioma hablado y traducir el contenido al idioma seleccionado por el usuario.
+
+El objetivo principal es crear una herramienta:
+
+* Gratuita.
+* Sin costos por minuto.
+* Sin suscripciones.
+* Sin límites artificiales de uso.
+* Capaz de funcionar completamente de forma local.
+* Sin necesidad de enviar el audio a servidores externos.
+* Modular y extensible.
+* Fácil de mantener.
+* Preparada para futuras funciones.
+
+El procesamiento local debe ser la prioridad del proyecto.
+
+---
+
+# 2. PRINCIPIO FUNDAMENTAL
+
+La aplicación debe diseñarse desde el inicio para que ningún componente importante dependa directamente de otro componente concreto.
+
+Por ejemplo:
+
+La interfaz NO debe comunicarse directamente con Whisper.
+
+La interfaz debe comunicarse con una capa de servicios.
+
+La capa de servicios debe comunicarse con interfaces abstractas.
+
+Ejemplo:
+
+UI
+↓
+Application Services
+↓
+Interfaces
+↓
+Implementación concreta
+
+Esto permitirá cambiar posteriormente:
+
+* Whisper por otro motor ASR.
+* Argos Translate por otro motor de traducción.
+* WASAPI por otra fuente de audio.
+* Tkinter/PySide por otra interfaz.
+* CPU por GPU.
+* Un modelo pequeño por uno más grande.
+
+sin tener que reconstruir todo el proyecto.
+
+---
+
+# 3. ARQUITECTURA GENERAL
+
+La aplicación debe dividirse conceptualmente en las siguientes capas:
+
+## Presentation Layer
+
+Responsable exclusivamente de la interfaz gráfica.
+
+No debe contener lógica de transcripción, traducción ni captura de audio.
+
+Responsabilidades:
+
+* Ventana principal.
+* Controles.
+* Subtítulos.
+* Texto original.
+* Traducción.
+* Estado del sistema.
+* Configuración.
+* Selección de idiomas.
+* Indicadores de actividad.
+* Mensajes de error.
+
+---
+
+## Application Layer
+
+Contendrá la lógica que coordina los diferentes componentes.
+
+Responsabilidades:
+
+* Iniciar y detener una sesión.
+* Coordinar captura de audio.
+* Enviar audio al motor ASR.
+* Recibir segmentos transcritos.
+* Enviar texto al traductor.
+* Actualizar el estado de la sesión.
+* Gestionar errores.
+* Coordinar configuración.
+* Gestionar historial de la sesión.
+
+La Application Layer no debe conocer detalles específicos de Whisper, WASAPI, Argos Translate o la GUI.
+
+---
+
+## Domain Layer
+
+Contendrá los modelos y conceptos fundamentales de la aplicación.
+
+Ejemplos:
+
+* AudioChunk.
+* TranscriptSegment.
+* TranslationSegment.
+* Language.
+* TranslationSession.
+* AudioDevice.
+* ProcessingStatus.
+* ApplicationSettings.
+
+Estos modelos deben ser independientes de cualquier biblioteca externa.
+
+---
+
+## Infrastructure Layer
+
+Contendrá las implementaciones concretas.
+
+Ejemplos:
+
+* Captura de audio mediante WASAPI.
+* Implementación de faster-whisper.
+* Implementación de detección de idioma.
+* Implementación de Argos Translate.
+* Persistencia de configuraciones.
+* Logs.
+* Gestión de modelos.
+* Acceso al sistema operativo.
+
+---
+
+# 4. FLUJO PRINCIPAL
+
+El flujo principal debe ser:
+
+Audio Source
+↓
+Audio Capture
+↓
+Audio Buffer
+↓
+Voice Activity Detection
+↓
+Speech Recognition / ASR
+↓
+Language Detection
+↓
+Transcript Segment
+↓
+Translation Engine
+↓
+Translation Segment
+↓
+Application State
+↓
+User Interface
+
+Cada etapa debe poder reemplazarse independientemente.
+
+---
+
+# 5. CAPTURA DE AUDIO
+
+La aplicación debe soportar inicialmente:
+
+### System Audio
+
+Capturar el audio que reproduce Windows.
+
+Esto permitirá traducir:
+
+* Zoom.
+* Google Meet.
+* Microsoft Teams.
+* Discord.
+* Navegadores.
+* Reproductores multimedia.
+* Clases online.
+* Vídeos.
+
+La arquitectura debe permitir agregar posteriormente:
+
+* Micrófono.
+* Dispositivo de entrada específico.
+* Audio virtual.
+* Archivos de audio.
+* Otras fuentes.
+
+La captura de audio debe estar detrás de una interfaz abstracta.
+
+Ejemplo conceptual:
+
+AudioSource
+├── SystemAudioSource
+├── MicrophoneAudioSource
+└── FileAudioSource
+
+---
+
+# 6. TRANSCRIPCIÓN
+
+El sistema debe utilizar inicialmente un motor local basado en Whisper/faster-whisper.
+
+Sin embargo, el resto del programa NO debe depender directamente de faster-whisper.
+
+Debe existir una abstracción similar a:
+
+ASREngine
+
+Responsabilidades:
+
+* Transcribir audio.
+* Detectar idioma.
+* Proporcionar segmentos.
+* Proporcionar timestamps.
+* Indicar estado del procesamiento.
+
+Implementación inicial:
+
+WhisperASREngine
+
+Implementaciones futuras posibles:
+
+* FasterWhisperEngine.
+* WhisperCppEngine.
+* Otro motor local.
+
+---
+
+# 7. DETECCIÓN DE IDIOMA
+
+El idioma de origen debe poder detectarse automáticamente.
+
+La detección debe estar desacoplada del sistema de traducción.
+
+Debe existir una representación estándar:
+
+LanguageCode
+
+Ejemplos:
+
+es
+en
+ko
+ja
+pt
+fr
+de
+it
+zh
+
+El sistema debe poder diferenciar:
+
+* Idioma detectado automáticamente.
+* Idioma seleccionado manualmente.
+* Idioma desconocido.
+* Confianza de detección.
+
+Si la detección automática no es suficientemente confiable, la aplicación debe poder permitir al usuario seleccionar manualmente el idioma.
+
+---
+
+# 8. TRADUCCIÓN
+
+Debe existir una abstracción independiente:
+
+TranslationEngine
+
+Responsabilidades:
+
+* Traducir texto.
+* Recibir idioma origen.
+* Recibir idioma destino.
+* Devolver traducción.
+* Informar errores.
+* Indicar si existe un modelo disponible.
+
+Implementación inicial:
+
+ArgosTranslationEngine
+
+La aplicación no debe depender directamente de Argos Translate.
+
+Esto permitirá posteriormente implementar:
+
+* Otro traductor offline.
+* Modelos especializados.
+* Traducción mediante LLM local.
+* Otros motores.
+
+---
+
+# 9. PROCESAMIENTO EN TIEMPO REAL
+
+La aplicación debe funcionar mediante procesamiento por segmentos.
+
+No debe esperar a que termine toda la reunión.
+
+Conceptualmente:
+
+Audio
+→ pequeños bloques
+→ procesamiento
+→ segmento
+→ traducción
+→ UI
+
+Debe existir una cola de procesamiento para evitar bloquear la interfaz.
+
+La GUI nunca debe ejecutar directamente operaciones pesadas.
+
+Operaciones como:
+
+* Transcripción.
+* Traducción.
+* Carga de modelos.
+* Captura.
+* Procesamiento de audio.
+
+deben ejecutarse fuera del hilo principal de la interfaz.
+
+---
+
+# 10. VOICE ACTIVITY DETECTION
+
+El sistema debe contemplar una capa de detección de voz.
+
+Su objetivo es evitar procesar continuamente:
+
+* Silencio.
+* Ruido.
+* Música.
+* Audio irrelevante.
+
+Debe existir una abstracción:
+
+VoiceActivityDetector
+
+Esto permitirá utilizar posteriormente diferentes implementaciones.
+
+---
+
+# 11. MODELOS
+
+Los modelos de IA no deben incluirse directamente dentro del repositorio Git.
+
+La aplicación debe disponer de un sistema de:
+
+Model Manager
+
+Responsabilidades:
+
+* Detectar modelos instalados.
+* Descargar modelos cuando corresponda.
+* Verificar integridad.
+* Mostrar tamaño.
+* Mostrar estado.
+* Permitir seleccionar modelo.
+* Permitir eliminar modelos.
+* Permitir actualizar modelos.
+
+Los modelos deben almacenarse en una ubicación externa apropiada.
+
+---
+
+# 12. CONFIGURACIÓN
+
+Toda configuración del usuario debe estar centralizada.
+
+Ejemplos:
+
+* Idioma de destino.
+* Idioma de origen.
+* Modelo ASR.
+* Modelo de traducción.
+* Fuente de audio.
+* Volumen.
+* Tema.
+* Tamaño de texto.
+* Transparencia.
+* Posición de ventana.
+* Modo subtítulos.
+* Guardado automático.
+* Carpeta de historial.
+
+No se deben almacenar configuraciones importantes dispersas por el código.
+
+Debe existir:
+
+ConfigManager
+
+y un modelo:
+
+ApplicationSettings
+
+---
+
+# 13. SESIONES
+
+Cada vez que el usuario inicia una traducción debe existir una:
+
+TranslationSession
+
+La sesión debe poder contener:
+
+* Hora de inicio.
+* Fuente de audio.
+* Idioma detectado.
+* Idioma destino.
+* Segmentos originales.
+* Traducciones.
+* Timestamps.
+* Estado.
+* Errores.
+
+Esto permitirá posteriormente guardar reuniones completas.
+
+---
+
+# 14. HISTORIAL
+
+El sistema debe estar preparado para guardar sesiones.
+
+Formatos futuros posibles:
+
+* JSON.
+* TXT.
+* SRT.
+* VTT.
+* Markdown.
+
+El historial debe estar desacoplado del motor de traducción.
+
+Debe existir una capa:
+
+SessionStorage
+
+Implementaciones futuras:
+
+JsonSessionStorage
+TextSessionStorage
+SubtitleSessionStorage
+
+---
+
+# 15. INTERFAZ
+
+La interfaz inicial debe priorizar:
+
+* Claridad.
+* Bajo consumo.
+* Legibilidad.
+* Rapidez.
+* Accesibilidad.
+
+Debe mostrar como mínimo:
+
+### Estado
+
+* Inactivo.
+* Preparando.
+* Escuchando.
+* Procesando.
+* Traduciendo.
+* Error.
+
+### Idioma
+
+Idioma detectado.
+
+### Traducción
+
+Idioma destino.
+
+### Texto
+
+Texto original.
+
+### Traducción
+
+Texto traducido.
+
+### Controles
+
+* Iniciar.
+* Detener.
+* Pausar.
+* Configuración.
+
+La interfaz debe poder evolucionar posteriormente sin modificar los motores internos.
+
+---
+
+# 16. MODO SUBTÍTULOS
+
+Debe contemplarse desde la arquitectura inicial un modo de subtítulos.
+
+Características futuras:
+
+* Texto grande.
+* Fondo transparente.
+* Ventana siempre encima.
+* Ajuste de tamaño.
+* Ajuste de transparencia.
+* Posición configurable.
+* Mostrar solamente traducción.
+* Mostrar original + traducción.
+
+---
+
+# 17. LOGGING
+
+Debe existir un sistema centralizado de logs.
+
+Nunca utilizar exclusivamente print() para errores importantes.
+
+Los logs deben permitir identificar:
+
+* Inicio de aplicación.
+* Carga de modelos.
+* Dispositivos de audio.
+* Inicio de sesión.
+* Errores de captura.
+* Errores ASR.
+* Errores de traducción.
+* Errores de configuración.
+* Errores de modelos.
+
+Debe existir separación entre:
+
+INFO
+WARNING
+ERROR
+DEBUG
+
+El usuario final no debe necesitar ver logs técnicos salvo cuando se active un modo diagnóstico.
+
+---
+
+# 18. MANEJO DE ERRORES
+
+Los errores deben ser controlados por capas.
+
+Un fallo del traductor no debe cerrar toda la aplicación.
+
+Un fallo de un segmento no debe destruir la sesión completa.
+
+Un problema con un modelo debe mostrar un mensaje comprensible.
+
+Ejemplo:
+
+ERROR TÉCNICO:
+
+ModelNotFoundError
+
+MENSAJE PARA USUARIO:
+
+"No se encontró el modelo de traducción seleccionado."
+
+---
+
+# 19. RENDIMIENTO
+
+El objetivo principal será conseguir la menor latencia posible manteniendo buena precisión.
+
+La arquitectura debe permitir:
+
+* CPU.
+* GPU NVIDIA.
+* GPU AMD cuando sea viable.
+* Diferentes tamaños de modelos.
+* Procesamiento paralelo.
+* Caché.
+* Colas de trabajo.
+
+Debe evitarse consumir recursos innecesariamente.
+
+La aplicación debe poder ejecutarse en equipos modestos utilizando modelos pequeños.
+
+---
+
+# 20. PRIVACIDAD
+
+El diseño debe priorizar procesamiento local.
+
+Por defecto:
+
+* El audio no debe enviarse a Internet.
+* Las transcripciones no deben enviarse a servidores.
+* Las traducciones no deben enviarse a servicios externos.
+* No debe requerirse una cuenta.
+* No debe requerirse API key.
+
+Si en el futuro se añade un servicio online opcional, debe estar:
+
+* Desactivado por defecto.
+* Claramente identificado.
+* Separado del funcionamiento offline.
+
+---
+
+# 21. ESTRUCTURA DEL PROYECTO
+
+La estructura debe seguir una arquitectura modular similar a:
+
+project/
+│
+├── app/
+│   ├── presentation/
+│   ├── application/
+│   ├── domain/
+│   └── infrastructure/
+│
+├── engines/
+│   ├── asr/
+│   ├── translation/
+│   ├── audio/
+│   └── vad/
+│
+├── models/
+│
+├── config/
+│
+├── data/
+│
+├── logs/
+│
+├── tests/
+│
+├── scripts/
+│
+├── docs/
+│
+├── resources/
+│
+├── launcher/
+│
+├── requirements/
+│
+├── .gitignore
+├── README.md
+├── LICENSE
+└── main.py
+
+La estructura exacta podrá modificarse durante la implementación si existe una razón técnica sólida, pero NO deben realizarse reorganizaciones grandes sin justificar previamente el motivo.
+
+---
+
+# 22. TESTING
+
+El proyecto debe incluir pruebas desde etapas tempranas.
+
+Debe existir separación entre:
+
+* Unit tests.
+* Integration tests.
+* Audio tests.
+* ASR tests.
+* Translation tests.
+* UI tests.
+
+Los motores deben poder probarse independientemente de la interfaz.
+
+Por ejemplo:
+
+ASR Engine
+→ recibe un archivo de audio de prueba
+→ devuelve TranscriptSegment
+
+sin necesidad de abrir la GUI.
+
+---
+
+# 23. DOCUMENTACIÓN
+
+Cada módulo importante debe estar documentado.
+
+Debe existir como mínimo:
+
+README.md
+
+docs/
+├── architecture.md
+├── installation.md
+├── development.md
+├── troubleshooting.md
+├── models.md
+└── roadmap.md
+
+La documentación debe actualizarse junto con cambios importantes del proyecto.
+
+---
+
+# 24. GIT Y VERSIONADO
+
+El repositorio debe mantenerse limpio.
+
+No subir:
+
+* Modelos grandes.
+* Cachés.
+* Logs personales.
+* Datos de reuniones.
+* Archivos temporales.
+* Entornos virtuales.
+* Credenciales.
+* Configuraciones personales.
+
+Debe existir un .gitignore adecuado desde el primer commit.
+
+Se debe utilizar versionado semántico:
+
+MAJOR.MINOR.PATCH
+
+Ejemplo:
+
+0.1.0
+0.2.0
+1.0.0
+
+---
+
+# 25. DESARROLLO POR FASES
+
+No intentar construir todo simultáneamente.
+
+### FASE 0 — Investigación
+
+Evaluar:
+
+* Captura de audio.
+* faster-whisper.
+* detección de idioma.
+* Argos Translate.
+* VAD.
+* rendimiento.
+
+### FASE 1 — Audio
+
+Crear sistema estable de captura de audio.
+
+### FASE 2 — ASR
+
+Implementar transcripción local.
+
+### FASE 3 — Traducción
+
+Implementar traducción local.
+
+### FASE 4 — Pipeline
+
+Conectar:
+
+Audio → ASR → Translation.
+
+### FASE 5 — GUI
+
+Crear interfaz funcional.
+
+### FASE 6 — Sesiones
+
+Agregar historial y almacenamiento.
+
+### FASE 7 — Optimización
+
+Reducir latencia y consumo.
+
+### FASE 8 — Instalador
+
+Crear instalador para usuarios finales.
+
+### FASE 9 — Distribución
+
+Preparar versión estable.
+
+---
+
+# 26. REGLAS DE DESARROLLO
+
+Estas reglas son obligatorias:
+
+1. No mezclar lógica de UI con lógica de negocio.
+2. No crear dependencias circulares.
+3. No acoplar la aplicación a un único motor.
+4. No utilizar APIs online como dependencia obligatoria.
+5. No almacenar modelos dentro del repositorio.
+6. No bloquear el hilo de interfaz.
+7. No realizar refactorizaciones masivas sin justificar.
+8. No duplicar lógica.
+9. Mantener funciones y clases con responsabilidades claras.
+10. Priorizar código mantenible sobre soluciones rápidas.
+11. Cada nuevo componente importante debe tener una interfaz clara.
+12. Las decisiones arquitectónicas importantes deben documentarse.
+13. Antes de introducir una dependencia externa, evaluar su licencia, mantenimiento, compatibilidad y necesidad.
+14. La aplicación debe poder ejecutarse offline después de instalar y descargar los modelos necesarios.
+15. Ninguna característica nueva debe romper innecesariamente el funcionamiento existente.
+
+---
+
+# 27. PRINCIPIO DE COMPATIBILIDAD
+
+La aplicación debe estar diseñada pensando en futuras versiones.
+
+No asumir que:
+
+* Whisper será siempre el motor utilizado.
+* Argos será siempre el traductor.
+* Windows será siempre la única plataforma.
+* CPU será siempre el hardware utilizado.
+* Una determinada GUI será permanente.
+
+La arquitectura debe permitir evolucionar el proyecto sin reconstruirlo desde cero.
+
+---
+
+# 28. OBJETIVO FINAL
+
+El resultado final debe ser una aplicación de escritorio profesional capaz de:
+
+1. Detectar audio del PC.
+2. Detectar el idioma hablado.
+3. Transcribir voz en tiempo real.
+4. Traducir automáticamente.
+5. Mostrar la traducción con baja latencia.
+6. Funcionar sin conexión a Internet.
+7. No cobrar por minuto.
+8. No depender de APIs comerciales.
+9. Mantener un consumo razonable de recursos.
+10. Guardar las sesiones.
+11. Permitir configurar modelos e idiomas.
+12. Poder instalarse fácilmente en otro PC.
+
+La aplicación debe sentirse como un producto terminado y no como un simple script.
+
+---
+
+# 29. PRINCIPIO DEL PROYECTO
+
+"Local First."
+
+Todo aquello que pueda ejecutarse localmente debe ejecutarse localmente.
+
+La privacidad, independencia, ausencia de costos recurrentes y capacidad de uso ilimitado son requisitos fundamentales del proyecto.
+
+Antes de implementar cualquier componente, evaluar:
+
+¿Puede hacerse localmente?
+
+Si la respuesta es sí, priorizar la solución local.
