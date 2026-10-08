@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
-import shutil
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,20 +87,17 @@ def main() -> int:
             package.install_from_path(match.download())
 
         portable_dir = ROOT / "models" / "argos"
-        portable_dir.mkdir(parents=True, exist_ok=True)
-
-        copied = 0
-        for pkg in package.get_installed_packages():
-            if pkg.type != "translate" or not pkg.package_path.exists():
-                continue
-            destination = portable_dir / pkg.package_path.name
-            if destination.exists():
-                shutil.rmtree(destination)
-            shutil.copytree(pkg.package_path, destination)
-            copied += 1
-
-        if copied == 0:
-            raise RuntimeError("No local Argos translation packages were copied.")
+        installed_after = {
+            (p.from_code, p.to_code)
+            for p in package.get_installed_packages()
+            if p.type == "translate" and p.package_path.exists()
+        }
+        missing = [pair for pair in TRANSLATION_PAIRS if pair not in installed_after]
+        if missing:
+            raise RuntimeError(
+                "Required Argos packages are not installed in the local model directory: "
+                + ", ".join(f"{src}->{dst}" for src, dst in missing)
+            )
 
         READY_MARKER.parent.mkdir(parents=True, exist_ok=True)
         READY_MARKER.write_text(
@@ -109,7 +105,7 @@ def main() -> int:
             encoding="utf-8",
         )
 
-        print(f"Portable Argos packages copied to: {portable_dir}")
+        print(f"Argos packages verified in: {portable_dir}")
         print(f"Model readiness marker created: {READY_MARKER}")
         print("Local model preparation completed.")
         return 0
