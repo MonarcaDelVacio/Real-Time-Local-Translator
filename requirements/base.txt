@@ -5,3 +5,4 @@ argostranslate @ git+https://github.com/argosopentech/argos-translate.git@17ed1a
 soundcard>=0.4.6,<0.5
 numpy>=1.26,<3
 PySide6-Essentials>=6.8,<7
+huggingface-hub>=0.25,<1
