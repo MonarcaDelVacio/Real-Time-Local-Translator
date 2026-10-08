@@ -112,7 +112,7 @@ def run_gui(application) -> int:
         worker = Worker(application, target.currentData())
         worker.translated.connect(
             lambda lang, translated, source: output.appendPlainText(
-                f"[{lang} → {target.currentData()}]\n{translated}\n"
+                f"[{lang} → {target.currentData()}]\nOriginal: {source}\nTraducción: {translated}\n"
             )
         )
         worker.status_changed.connect(status.setText)
@@ -134,6 +134,7 @@ def run_gui(application) -> int:
                     "Cierre pendiente",
                     "El motor todavía está finalizando la captura. Espera unos segundos.",
                 )
+                return
         finish_session()
 
     def clear_output():
@@ -142,7 +143,14 @@ def run_gui(application) -> int:
     def close_event(event):
         if worker is not None and worker.isRunning():
             worker.stop()
-            worker.wait(5000)
+            if not worker.wait(5000):
+                QMessageBox.warning(
+                    window,
+                    "Cierre pendiente",
+                    "La captura todavía está finalizando. Cierra la ventana cuando termine.",
+                )
+                event.ignore()
+                return
         event.accept()
 
     window.closeEvent = close_event
