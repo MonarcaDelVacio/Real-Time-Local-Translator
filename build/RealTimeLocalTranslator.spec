@@ -8,7 +8,7 @@ datas = [(str(ROOT / "models"), "models")]
 binaries = []
 hiddenimports = []
 
-for package_name in ("faster_whisper", "ctranslate2", "argostranslate", "soundcard", "numpy"):
+for package_name in ("faster_whisper", "ctranslate2", "argostranslate", "soundcard", "numpy", "PySide6"):
     d, b, h = collect_all(package_name)
     datas += d
     binaries += b
