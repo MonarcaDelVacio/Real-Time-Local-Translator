@@ -1,7 +1,7 @@
 ; Inno Setup script for the packaged desktop application.
 
 #define MyAppName "Real-Time Local Translator"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.1"
 #define MyAppPublisher "MonarcaDelVacio"
 
 [Setup]
