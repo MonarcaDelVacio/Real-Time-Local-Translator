@@ -22,7 +22,7 @@ PrivilegesRequired=admin
 UninstallDisplayIcon={app}\RealTimeLocalTranslator.exe
 
 [Files]
-Source: "..\dist\RealTimeLocalTranslator\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+Source: "..\dist\RealTimeLocalTranslator\*"; Excludes: "PySide6\qml\*,PySide6\plugins\designer\*,PySide6\plugins\qmltooling\*,PySide6\plugins\sqldrivers\*,numpy\tests\*,numpy\typing\tests\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 Source: "..\redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
