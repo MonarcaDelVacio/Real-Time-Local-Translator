@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+
 import numpy as np
 
 from app.domain.models import AudioChunk, TranscriptSegment
@@ -11,7 +12,13 @@ from app.domain.ports import ASREngine
 class FasterWhisperASR(ASREngine):
     """Local faster-whisper adapter. Runtime never downloads models."""
 
-    def __init__(self, model_path: str, device: str = "cpu", compute_type: str = "int8", local_only: bool = True) -> None:
+    def __init__(
+        self,
+        model_path: str,
+        device: str = "cpu",
+        compute_type: str = "int8",
+        local_only: bool = True,
+    ) -> None:
         from faster_whisper import WhisperModel
 
         path = Path(model_path)
@@ -30,17 +37,26 @@ class FasterWhisperASR(ASREngine):
         chunks = list(chunks)
         if not chunks:
             return []
+
         channels = max(1, chunks[0].channels)
-        audio = np.frombuffer(b"".join(c.samples for c in chunks), dtype=np.float32)
+        audio = np.frombuffer(
+            b"".join(c.samples for c in chunks), dtype=np.float32
+        )
         if channels > 1:
             usable = (audio.size // channels) * channels
             audio = audio[:usable].reshape(-1, channels).mean(axis=1)
+
         segments, info = self.model.transcribe(
             audio,
             language=None,
-            vad_filter=False,
-            beam_size=1,
-            condition_on_previous_text=False,
+            vad_filter=True,
+            beam_size=5,
+            best_of=5,
+            temperature=0.0,
+            condition_on_previous_text=True,
+            no_speech_threshold=0.6,
+            log_prob_threshold=-1.0,
+            compression_ratio_threshold=2.4,
         )
         return [
             TranscriptSegment(
