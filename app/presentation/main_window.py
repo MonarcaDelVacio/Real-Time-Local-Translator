@@ -25,6 +25,20 @@ def run_gui(application) -> int:
         QWidget,
     )
 
+
+    class ModelSetupWorker(QThread):
+        status_changed = Signal(str)
+        finished_ok = Signal()
+        failed = Signal(str)
+
+        def run(self):
+            try:
+                from app.infrastructure.model_manager import ensure_models
+                ensure_models(self.status_changed.emit)
+                self.finished_ok.emit()
+            except Exception as exc:
+                self.failed.emit(str(exc))
+
     class Worker(QThread):
         translated = Signal(str, str, str, bool)
         status_changed = Signal(str)
@@ -362,4 +376,18 @@ def run_gui(application) -> int:
     stop.setEnabled(False)
 
     window.show()
+
+    # Every installed build verifies its external model set before allowing a session.
+    # Missing/corrupt models are repaired into LOCALAPPDATA without administrator access.
+    from app.infrastructure.model_manager import models_ready
+    setup_worker = None
+    if not models_ready():
+        start.setEnabled(False)
+        status.setText("●  Verificando modelos y dependencias locales…")
+        setup_worker = ModelSetupWorker()
+        setup_worker.status_changed.connect(lambda value: status.setText("●  " + value))
+        setup_worker.finished_ok.connect(lambda: (start.setEnabled(True), status.setText("●  Listo · modelos verificados")))
+        setup_worker.failed.connect(lambda error: (status.setText("●  Error al preparar modelos"), show_error_dialog("No se pudieron preparar los modelos", error)))
+        setup_worker.start()
+
     return app.exec()
