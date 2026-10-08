@@ -1,5 +1,6 @@
 # Runtime dependencies. Processing is local/offline after installation.
 sherpa-onnx>=1.13.8,<1.14
+faster-whisper>=1.2,<2
 argostranslate @ git+https://github.com/argosopentech/argos-translate.git@17ed1a9b055c5ba1b51d76b683bbb0c64e2a4a88
 soundcard>=0.4.6,<0.5
 numpy>=1.26,<3
