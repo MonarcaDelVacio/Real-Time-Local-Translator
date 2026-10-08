@@ -119,3 +119,8 @@ El audio no se envía a un proveedor externo. Los modelos y paquetes se procesan
 ## Licencia
 
 MIT para el código del proyecto. Las licencias de modelos y dependencias de terceros deben revisarse antes de una distribución comercial.
+
+
+## Experimental 0.4.1 quality pass
+
+This branch uses stabilized streaming translation: partial ASR is not sent to the translator, the source language is forced for the current English↔Spanish mode, and the Nemotron 1120 ms profile is used for additional look-ahead context.
