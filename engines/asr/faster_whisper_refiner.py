@@ -85,8 +85,9 @@ class FasterWhisperRefiner(ASRRefiner):
             best_of=5,
             temperature=0.0,
             condition_on_previous_text=False,
-            vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 400},
+            # The streaming endpoint already delimits the phrase. A second VAD pass
+            # could discard short words during fast speech, so keep the complete audio.
+            vad_filter=False,
         )
 
         output: list[TranscriptSegment] = []
