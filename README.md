@@ -58,7 +58,9 @@ La selección de más idiomas se ampliará después de validar correctamente aud
 
 ## Probar la versión descargable
 
-La compilación Windows se genera mediante GitHub Actions. El instalador resultante es:
+La compilación Windows se genera mediante GitHub Actions. El instalador resultante se publica como artefacto del workflow. Hasta que el workflow termine correctamente, no debe considerarse un instalador validado.
+
+El instalador resultante es:
 
 `RealTimeLocalTranslatorSetup-0.3.1.exe`
 
