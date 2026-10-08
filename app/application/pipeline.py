@@ -6,6 +6,7 @@ from datetime import datetime
 from app.domain.models import AudioChunk, TranslationSegment, TranscriptSegment
 from app.domain.ports import (
     ASREngine,
+    ASRRefiner,
     AudioSource,
     StreamingASREngine,
     TranslationEngine,
@@ -26,6 +27,7 @@ class TranslationPipeline:
         silence_chunks: int = 4,
         max_utterance_seconds: float = 20.0,
         max_buffer_chunks: int = 400,
+        refiner: ASRRefiner | None = None,
     ) -> None:
         if silence_chunks < 1 or max_utterance_seconds <= 0 or max_buffer_chunks < 1:
             raise ValueError("Invalid pipeline limits")
@@ -37,6 +39,7 @@ class TranslationPipeline:
         self.silence_chunks = silence_chunks
         self.max_utterance_seconds = max_utterance_seconds
         self.max_buffer_chunks = max_buffer_chunks
+        self.refiner = refiner
         self._speech: list[AudioChunk] = []
         self._silence = 0
 
@@ -163,11 +166,24 @@ class TranslationPipeline:
                 # false words and unstable translations. The GUI can still use
                 # these partials as live transcription/status.
                 segments = list(engine.accept_audio(chunk))
+                # Keep exact audio for the current utterance so a stronger
+                # offline model can correct the completed streaming transcript.
+                self._speech.append(chunk)
+
                 for segment in segments:
                     if segment.is_final:
-                        self._translate_segments(
-                            [segment], on_translation, on_error
-                        )
+                        audio = list(self._speech)
+                        self._speech.clear()
+                        final_segments = [segment]
+                        if self.refiner is not None:
+                            try:
+                                refined = list(self.refiner.refine(audio, source_language))
+                                if refined:
+                                    final_segments = refined
+                            except Exception as exc:
+                                if on_error is not None:
+                                    on_error(exc)
+                        self._translate_segments(final_segments, on_translation, on_error)
                     elif segment.text.strip():
                         on_translation(
                             TranslationSegment(
@@ -178,7 +194,16 @@ class TranslationPipeline:
                             )
                         )
 
-            finals = engine.finish_stream()
+            finals = list(engine.finish_stream())
+            if self._speech and self.refiner is not None:
+                try:
+                    refined = list(self.refiner.refine(self._speech, source_language))
+                    if refined:
+                        finals = refined
+                except Exception as exc:
+                    if on_error is not None:
+                        on_error(exc)
+            self._speech.clear()
             self._translate_segments(finals, on_translation, on_error)
         except Exception as exc:
             if on_error is not None:
