@@ -29,7 +29,7 @@ echo [OK] Python command detected: %PYTHON_CMD%
 %PYTHON_CMD% --version
 echo.
 
-if not exist ".venvScriptspython.exe" (
+if not exist ".venv\Scripts\python.exe" (
     echo [1/5] Creating local Python environment...
     %PYTHON_CMD% -m venv ".venv"
     if errorlevel 1 (
@@ -42,7 +42,7 @@ if not exist ".venvScriptspython.exe" (
 )
 echo.
 
-set "VENV_PY=.venvScriptspython.exe"
+set "VENV_PY=.venv\Scripts\python.exe"
 
 echo [2/5] Checking Python environment...
 "%VENV_PY%" --version
@@ -57,7 +57,7 @@ echo [3/5] Checking/installing application dependencies...
 echo First run may take a few minutes. Already-installed packages are reused.
 echo.
 
-"%VENV_PY%" -m pip install -r "requirementsase.txt"
+"%VENV_PY%" -m pip install -r "requirements\base.txt"
 if errorlevel 1 (
     echo [ERROR] Runtime dependencies could not be installed.
     goto :FAIL
@@ -77,9 +77,9 @@ echo [OK] Runtime imports verified.
 echo.
 
 echo [5/5] Checking local AI models...
-if not exist "models.ready" (
+if not exist "models\.ready" (
     echo [INFO] Local model set is incomplete. Preparing it now...
-    "%VENV_PY%" "scriptsprepare_streaming_models.py"
+    "%VENV_PY%" "scripts\prepare_streaming_models.py"
     if errorlevel 1 (
         echo [ERROR] Local AI model preparation failed.
         goto :FAIL
