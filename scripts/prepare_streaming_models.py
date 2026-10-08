@@ -5,7 +5,7 @@ import subprocess
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = "nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11"
+MODEL = "nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11"
 ARCHIVE_NAME = f"sherpa-onnx-{MODEL}.tar.bz2"
 URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
@@ -22,7 +22,6 @@ def _find_model_directory(root: Path) -> Path | None:
     direct = root / MODEL
     if all(p.is_file() for p in _required(direct)):
         return direct
-
     for tokens in root.rglob("tokens.txt"):
         candidate = tokens.parent
         if all(p.is_file() for p in _required(candidate)):
@@ -32,8 +31,6 @@ def _find_model_directory(root: Path) -> Path | None:
 
 def _download(archive: Path) -> None:
     print(f"Downloading {ARCHIVE_NAME} from the official Sherpa-ONNX release...")
-    # curl is preinstalled on GitHub Windows runners and handles GitHub release
-    # redirects/retries reliably for this large model archive.
     curl = shutil.which("curl.exe") or shutil.which("curl")
     if not curl:
         raise RuntimeError("curl.exe is required to download the Sherpa model.")
@@ -41,22 +38,13 @@ def _download(archive: Path) -> None:
         archive.unlink()
     subprocess.run(
         [
-            curl,
-            "--fail",
-            "--location",
-            "--retry", "5",
-            "--retry-delay", "5",
-            "--retry-all-errors",
-            "--continue-at", "-",
-            "--output", str(archive),
-            URL,
+            curl, "--fail", "--location", "--retry", "5", "--retry-delay", "5",
+            "--retry-all-errors", "--continue-at", "-", "--output", str(archive), URL,
         ],
         check=True,
     )
     size = archive.stat().st_size
     print(f"Downloaded archive size: {size / (1024 * 1024):.1f} MiB")
-    # The current Nemotron archive is about 453 MiB compressed, so do not use
-    # an outdated 500 MB lower bound. A very small file still indicates failure.
     if size < 50_000_000:
         raise RuntimeError("Downloaded Sherpa archive is unexpectedly small or incomplete.")
 
@@ -67,10 +55,7 @@ def _extract(archive: Path, model_root: Path) -> Path:
         tar.extractall(model_root)
     found = _find_model_directory(model_root)
     if found is None:
-        raise RuntimeError(
-            "Sherpa archive extracted successfully, but the expected ONNX files "
-            "could not be found. Archive layout did not match the expected model."
-        )
+        raise RuntimeError("Sherpa archive extracted successfully, but the expected ONNX files could not be found.")
     model_dir = model_root / MODEL
     if found.resolve() != model_dir.resolve():
         if model_dir.exists():
@@ -108,18 +93,14 @@ def main() -> None:
         if p.type == "translate"
     }
     for src, dst in wanted - installed:
-        match = next(
-            (p for p in available if p.from_code == src and p.to_code == dst),
-            None,
-        )
+        match = next((p for p in available if p.from_code == src and p.to_code == dst), None)
         if match is None:
             raise RuntimeError(f"Argos package unavailable: {src}->{dst}")
         print(f"Installing Argos {src}->{dst}...")
         package.install_from_path(match.download())
 
-    (ROOT / "models" / ".ready").write_text(
-        "streaming models ready\n", encoding="utf-8"
-    )
+    (ROOT / "models" / ".ready").write_text("streaming models ready
+", encoding="utf-8")
     print("Local streaming models are ready.")
 
 
