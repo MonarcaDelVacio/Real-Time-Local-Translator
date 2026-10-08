@@ -385,6 +385,7 @@ def run_gui(application) -> int:
         start.setEnabled(False)
         status.setText("●  Verificando modelos y dependencias locales…")
         setup_worker = ModelSetupWorker()
+        window._setup_worker = setup_worker
         setup_worker.status_changed.connect(lambda value: status.setText("●  " + value))
         setup_worker.finished_ok.connect(lambda: (start.setEnabled(True), status.setText("●  Listo · modelos verificados")))
         setup_worker.failed.connect(lambda error: (status.setText("●  Error al preparar modelos"), show_error_dialog("No se pudieron preparar los modelos", error)))
