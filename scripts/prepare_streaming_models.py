@@ -21,8 +21,8 @@ REQUIRED_NAMES = (
 WHISPER_REQUIRED_NAMES = (
     "config.json",
     "model.bin",
-    "preprocessor_config.json",
     "tokenizer.json",
+    "vocabulary.txt",
 )
 
 
