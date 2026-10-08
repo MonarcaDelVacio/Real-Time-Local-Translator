@@ -13,7 +13,7 @@ from app.domain.ports import (
 
 
 class TranslationPipeline:
-    """Translate either chunked offline ASR or true streaming ASR."""
+    """Translate chunked offline ASR or stabilized true streaming ASR."""
 
     def __init__(
         self,
@@ -88,9 +88,10 @@ class TranslationPipeline:
         segments: Iterable[TranscriptSegment],
         on_translation: Callable[[TranslationSegment], None],
         on_error: Callable[[Exception], None] | None,
+        finals_only: bool = False,
     ) -> None:
         for segment in segments:
-            if not segment.text.strip():
+            if not segment.text.strip() or (finals_only and not segment.is_final):
                 continue
             try:
                 translated = self.translator.translate(
@@ -143,16 +144,41 @@ class TranslationPipeline:
         engine = self.asr
         if not isinstance(engine, StreamingASREngine):
             raise TypeError("Streaming pipeline requires a streaming ASR engine")
+
+        # Current Preview supports English↔Spanish. The selected target lets us
+        # know the expected source language, so avoid auto-detection mistakes.
+        source_language = "en" if self.target_language == "es" else "es"
+        set_source_language = getattr(engine, "set_source_language", None)
+        if set_source_language is not None:
+            set_source_language(source_language)
+
         engine.start_stream()
         try:
             while not stop_requested():
                 chunk = self.source.read()
-                self._translate_segments(
-                    engine.accept_audio(chunk), on_translation, on_error
-                )
-            self._translate_segments(
-                engine.finish_stream(), on_translation, on_error
-            )
+
+                # Partial ASR is useful for responsiveness, but MUST NOT be
+                # sent through Argos: translating incomplete hypotheses creates
+                # false words and unstable translations. The GUI can still use
+                # these partials as live transcription/status.
+                segments = list(engine.accept_audio(chunk))
+                for segment in segments:
+                    if segment.is_final:
+                        self._translate_segments(
+                            [segment], on_translation, on_error
+                        )
+                    elif segment.text.strip():
+                        on_translation(
+                            TranslationSegment(
+                                source=segment,
+                                translated_text=segment.text,
+                                target_language_code=segment.language_code or source_language,
+                                created_at=segment.end,
+                            )
+                        )
+
+            finals = engine.finish_stream()
+            self._translate_segments(finals, on_translation, on_error)
         except Exception as exc:
             if on_error is not None:
                 on_error(exc)
