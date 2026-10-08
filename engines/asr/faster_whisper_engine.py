@@ -17,7 +17,7 @@ class FasterWhisperASR(ASREngine):
         path = Path(model_path)
         if local_only and not path.exists():
             raise FileNotFoundError(
-                f"Local Whisper model not found: {path}. Run scripts\\run_dev.ps1 first."
+                f"Local Whisper model not found: {path}. Run run.bat first to prepare the local model."
             )
         self.model = WhisperModel(
             str(path) if path.exists() else model_path,
