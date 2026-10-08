@@ -68,7 +68,7 @@ echo [OK] Runtime dependencies are ready.
 echo.
 
 echo [4/5] Checking local application imports...
-"%VENV_PY%" -c "import PySide6, numpy, soundcard, faster_whisper, argostranslate; from PySide6 import QtWidgets; print('All runtime imports OK.')"
+"%VENV_PY%" -c "import PySide6, numpy, soundcard, sherpa_onnx, argostranslate; from PySide6 import QtWidgets; print('All runtime imports OK.')"
 if errorlevel 1 (
     echo [ERROR] One or more application dependencies cannot be imported.
     goto :FAIL
@@ -79,7 +79,7 @@ echo.
 echo [5/5] Checking local AI models...
 if not exist "models.ready" (
     echo [INFO] Local model set is incomplete. Preparing it now...
-    "%VENV_PY%" "scriptsprepare_local_models.py"
+    "%VENV_PY%" "scriptsprepare_streaming_models.py"
     if errorlevel 1 (
         echo [ERROR] Local AI model preparation failed.
         goto :FAIL
