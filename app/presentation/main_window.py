@@ -20,7 +20,7 @@ def run_gui(application) -> int:
     )
 
     class Worker(QThread):
-        translated = Signal(str, str, str)
+        translated = Signal(str, str, str, bool)
         status_changed = Signal(str)
         failed = Signal(str)
         finished_cleanly = Signal()
@@ -42,6 +42,7 @@ def run_gui(application) -> int:
                         x.source.language_code or "auto",
                         x.translated_text,
                         x.source.text,
+                        x.source.is_final,
                     ),
                     self.stop_flag.is_set,
                     lambda e: self.failed.emit(str(e)),
@@ -116,8 +117,11 @@ def run_gui(application) -> int:
 
         worker = Worker(application, target.currentData())
 
-        def append_translation(lang, translated, source):
+        def append_translation(lang, translated, source, is_final):
             target_code = target.currentData()
+            if not is_final:
+                return
+
             if show_original.isChecked():
                 output.appendPlainText(
                     f"[{lang} → {target_code}]\n"
