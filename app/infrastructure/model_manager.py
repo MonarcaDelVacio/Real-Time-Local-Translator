@@ -19,6 +19,23 @@ WHISPER_REQUIRED = ("config.json", "model.bin", "tokenizer.json", "vocabulary.tx
 ARGOS_REQUIRED = (("en", "es"), ("es", "en"))
 
 
+def _ensure_gui_stdio() -> None:
+    """Give console-oriented libraries a writable stream in windowed builds.
+
+    PyInstaller windowed executables intentionally start with sys.stdout/sys.stderr
+    set to None. Libraries such as huggingface_hub/tqdm and Argos may still try to
+    write progress or diagnostics there, which otherwise causes:
+    AttributeError: 'NoneType' object has no attribute 'write'
+    """
+    import io
+    import sys
+
+    if sys.stdout is None:
+        sys.stdout = io.StringIO()
+    if sys.stderr is None:
+        sys.stderr = io.StringIO()
+
+
 def _complete(path: Path, names: tuple[str, ...]) -> bool:
     return path.is_dir() and all((path / name).is_file() for name in names)
 
