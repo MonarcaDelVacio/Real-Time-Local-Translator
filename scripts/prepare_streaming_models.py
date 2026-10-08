@@ -11,7 +11,12 @@ URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
     f"asr-models/{ARCHIVE_NAME}"
 )
-REQUIRED_NAMES = ("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
+REQUIRED_NAMES = (
+    "encoder.int8.onnx",
+    "decoder.int8.onnx",
+    "joiner.int8.onnx",
+    "tokens.txt",
+)
 
 
 def _required(directory: Path) -> list[Path]:
@@ -38,8 +43,19 @@ def _download(archive: Path) -> None:
         archive.unlink()
     subprocess.run(
         [
-            curl, "--fail", "--location", "--retry", "5", "--retry-delay", "5",
-            "--retry-all-errors", "--continue-at", "-", "--output", str(archive), URL,
+            curl,
+            "--fail",
+            "--location",
+            "--retry",
+            "5",
+            "--retry-delay",
+            "5",
+            "--retry-all-errors",
+            "--continue-at",
+            "-",
+            "--output",
+            str(archive),
+            URL,
         ],
         check=True,
     )
@@ -55,7 +71,9 @@ def _extract(archive: Path, model_root: Path) -> Path:
         tar.extractall(model_root)
     found = _find_model_directory(model_root)
     if found is None:
-        raise RuntimeError("Sherpa archive extracted successfully, but the expected ONNX files could not be found.")
+        raise RuntimeError(
+            "Sherpa archive extracted successfully, but the expected ONNX files could not be found."
+        )
     model_dir = model_root / MODEL
     if found.resolve() != model_dir.resolve():
         if model_dir.exists():
@@ -93,14 +111,19 @@ def main() -> None:
         if p.type == "translate"
     }
     for src, dst in wanted - installed:
-        match = next((p for p in available if p.from_code == src and p.to_code == dst), None)
+        match = next(
+            (p for p in available if p.from_code == src and p.to_code == dst),
+            None,
+        )
         if match is None:
             raise RuntimeError(f"Argos package unavailable: {src}->{dst}")
         print(f"Installing Argos {src}->{dst}...")
         package.install_from_path(match.download())
 
-    (ROOT / "models" / ".ready").write_text("streaming models ready
-", encoding="utf-8")
+    (ROOT / "models" / ".ready").write_text(
+        "streaming models ready\n",
+        encoding="utf-8",
+    )
     print("Local streaming models are ready.")
 
 
