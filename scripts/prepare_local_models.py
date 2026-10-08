@@ -15,18 +15,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# The first downloadable Preview intentionally focuses on the two directions
-# needed for a complete end-to-end validation: English <-> Spanish.
 TRANSLATION_PAIRS = [
     ("en", "es"),
     ("es", "en"),
 ]
 
+WHISPER_MODEL_MARKER = ROOT / "models" / "whisper" / "base" / "model.bin"
+READY_MARKER = ROOT / "models" / ".ready"
+
 
 def main() -> int:
     try:
-        # Keep Argos model data inside the project for portable/offline use.
         os.environ["ARGOS_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
+
         from config.defaults import (
             DEFAULT_ASR_COMPUTE_TYPE,
             DEFAULT_ASR_DEVICE,
@@ -38,21 +39,25 @@ def main() -> int:
         model_dir = ROOT / "models" / "whisper" / DEFAULT_ASR_MODEL
         model_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"Preparing local Whisper model: {DEFAULT_ASR_MODEL}")
-        local_path = download_model(DEFAULT_ASR_MODEL, output_dir=str(model_dir))
-        print(f"Whisper model ready at: {local_path}")
+        if WHISPER_MODEL_MARKER.exists():
+            print(f"Whisper model already present: {model_dir}")
+        else:
+            print(f"Downloading local Whisper model: {DEFAULT_ASR_MODEL}")
+            local_path = download_model(DEFAULT_ASR_MODEL, output_dir=str(model_dir))
+            print(f"Whisper model downloaded to: {local_path}")
 
+        print("Verifying Whisper in local-only mode...")
         WhisperModel(
             str(model_dir),
             device=DEFAULT_ASR_DEVICE,
             compute_type=DEFAULT_ASR_COMPUTE_TYPE,
             local_files_only=True,
         )
-        print("Whisper local verification passed.")
+        print("OK: Whisper local verification passed.")
 
         import argostranslate.package as package
 
-        print("Updating the Argos package index...")
+        print("Checking local Argos translation packages...")
         package.update_package_index()
         available = package.get_available_packages()
         installed = {
@@ -79,12 +84,13 @@ def main() -> int:
                     f"Required Argos package {source}->{target} is unavailable."
                 )
 
-            print(f"Installing local translation package {source}->{target}")
+            print(f"Downloading/installing Argos package {source}->{target}...")
             package.install_from_path(match.download())
 
         portable_dir = ROOT / "models" / "argos"
         portable_dir.mkdir(parents=True, exist_ok=True)
 
+        copied = 0
         for pkg in package.get_installed_packages():
             if pkg.type != "translate" or not pkg.package_path.exists():
                 continue
@@ -92,8 +98,19 @@ def main() -> int:
             if destination.exists():
                 shutil.rmtree(destination)
             shutil.copytree(pkg.package_path, destination)
+            copied += 1
+
+        if copied == 0:
+            raise RuntimeError("No local Argos translation packages were copied.")
+
+        READY_MARKER.parent.mkdir(parents=True, exist_ok=True)
+        READY_MARKER.write_text(
+            "Real-Time Local Translator local models are ready.\n",
+            encoding="utf-8",
+        )
 
         print(f"Portable Argos packages copied to: {portable_dir}")
+        print(f"Model readiness marker created: {READY_MARKER}")
         print("Local model preparation completed.")
         return 0
     except Exception as exc:
