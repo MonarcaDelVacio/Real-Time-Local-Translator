@@ -100,6 +100,7 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                     end=chunk_timestamp,
                     language_code=self._language(result),
                     confidence=None,
+                    is_final=False,
                 )
             )
         return results
@@ -114,7 +115,7 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
         if self._recognizer.is_endpoint(self._stream):
             result = self._recognizer.get_result_all(self._stream)
             text = (getattr(result, "text", "") or "").strip()
-            if text and text != self._last_text:
+            if text:
                 results.append(
                     TranscriptSegment(
                         text=text,
@@ -122,9 +123,9 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                         end=chunk.timestamp,
                         language_code=self._language(result),
                         confidence=None,
+                        is_final=True,
                     )
                 )
-            if text:
                 # Mark endpoint by resetting the stream after the final partial.
                 self._recognizer.reset(self._stream)
                 self._last_text = ""
