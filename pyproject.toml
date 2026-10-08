@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "real-time-local-translator"
-version = "0.4.1"
+version = "0.4.2"
 description = "Local real-time translator for Windows meetings and system audio."
 requires-python = ">=3.11"
 readme = "README.md"
