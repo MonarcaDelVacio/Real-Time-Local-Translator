@@ -57,7 +57,9 @@ jobs:
 
       - name: Build installer
         shell: pwsh
-        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\RealTimeLocalTranslator.iss'
+        run: |
+          New-Item -ItemType Directory -Force dist\\installer | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\\RealTimeLocalTranslator.iss /O"dist\\installer"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
