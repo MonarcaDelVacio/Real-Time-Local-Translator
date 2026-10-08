@@ -57,7 +57,7 @@ def run_gui(application) -> int:
 
     app = QApplication.instance() or QApplication([])
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.0")
+    window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.1")
     window.resize(1000, 700)
 
     central = QWidget()
@@ -95,7 +95,7 @@ def run_gui(application) -> int:
 
     layout.addWidget(title)
     layout.addWidget(
-        QLabel("Preview: traducción local Inglés ↔ Español")
+        QLabel("Experimental: ASR streaming estabilizado Inglés ↔ Español")
     )
     layout.addWidget(status)
     layout.addLayout(row)
