@@ -2,7 +2,7 @@ name: Windows build
 
 on:
   push:
-    branches: [main, experimental/sherpa-streaming-0.4]
+    branches: [main, experimental/sherpa-streaming-0.4, experimental/sherpa-quality-0.4.1]
   workflow_dispatch:
 
 jobs:
