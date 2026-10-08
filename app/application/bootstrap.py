@@ -8,7 +8,6 @@ def _build_pipeline():
         DEFAULT_ASR_MODEL,
         DEFAULT_ASR_PROVIDER,
         DEFAULT_ASR_THREADS,
-        DEFAULT_ASR_MODEL,
         DEFAULT_AUDIO_BLOCK_FRAMES,
         DEFAULT_CHANNELS,
         DEFAULT_MAX_BUFFER_CHUNKS,
@@ -40,7 +39,7 @@ def _build_pipeline():
     )
     refiner = FasterWhisperRefiner(
         str(root / "models" / "whisper" / "small"),
-        cpu_threads=DEFAULT_ASR_THREADS,
+        num_threads=DEFAULT_ASR_THREADS,
         local_only=True,
     )
     return TranslationPipeline(
