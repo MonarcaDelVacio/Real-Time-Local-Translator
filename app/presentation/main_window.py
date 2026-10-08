@@ -15,7 +15,9 @@ def run_gui(application) -> int:
         QLabel,
         QMainWindow,
         QMessageBox,
+        QDialog,
         QTextEdit,
+        QDialogButtonBox,
         QProgressBar,
         QPushButton,
         QSpinBox,
@@ -207,6 +209,53 @@ def run_gui(application) -> int:
 
     worker = None
 
+    def show_error_dialog(title, message):
+        # Use a real text editor instead of QMessageBox so the complete error can
+        # be selected and copied with Ctrl+C, even when the system palette is odd.
+        dialog = QDialog(window)
+        dialog.setWindowTitle(title)
+        dialog.setModal(True)
+        dialog.resize(760, 420)
+        dialog.setStyleSheet("""
+            QDialog { background: #111827; }
+            QLabel { color: #e5edf7; }
+            QTextEdit {
+                background: #0b1220;
+                color: #f8fafc;
+                border: 1px solid #35445b;
+                border-radius: 8px;
+                padding: 8px;
+                selection-background-color: #2563eb;
+            }
+            QPushButton {
+                background: #202c40;
+                color: #f8fafc;
+                border: 1px solid #35445b;
+                border-radius: 7px;
+                padding: 7px 14px;
+            }
+            QPushButton:hover { border-color: #60a5fa; }
+        """)
+        dialog_layout = QVBoxLayout(dialog)
+        label = QLabel("La aplicación no pudo iniciar los motores locales. El texto de abajo se puede seleccionar y copiar con Ctrl+C:")
+        label.setWordWrap(True)
+        dialog_layout.addWidget(label)
+
+        error_box = QTextEdit()
+        error_box.setReadOnly(True)
+        error_box.setPlainText(str(message))
+        error_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        error_box.selectAll()
+        dialog_layout.addWidget(error_box, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        copy_button = QPushButton("Copiar error")
+        buttons.addButton(copy_button, QDialogButtonBox.ButtonRole.ActionRole)
+        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(error_box.toPlainText()))
+        buttons.rejected.connect(dialog.reject)
+        dialog_layout.addWidget(buttons)
+        dialog.exec()
+
     def save_preferences():
         settings.setValue("window/geometry", window.saveGeometry())
         settings.setValue("window/always_on_top", always_on_top_box.isChecked())
@@ -244,12 +293,7 @@ def run_gui(application) -> int:
             finish_session()
             if worker is not None and worker.error_message:
                 status.setText(f"●  Error: {worker.error_message}")
-                QMessageBox.critical(
-                    window,
-                    "No se pudo iniciar",
-                    "La aplicación no pudo iniciar los motores locales.\n\n"
-                    + worker.error_message,
-                )
+                show_error_dialog("No se pudo iniciar", worker.error_message)
             else:
                 status.setText("●  Detenido")
 
