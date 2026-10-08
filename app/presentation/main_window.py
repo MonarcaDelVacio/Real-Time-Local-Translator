@@ -14,7 +14,9 @@ def run_gui(application) -> int:
         QMainWindow,
         QMessageBox,
         QPlainTextEdit,
+        QProgressBar,
         QPushButton,
+        QSpinBox,
         QVBoxLayout,
         QWidget,
     )
@@ -22,6 +24,7 @@ def run_gui(application) -> int:
     class Worker(QThread):
         translated = Signal(str, str, str, bool)
         status_changed = Signal(str)
+        initialization_finished = Signal()
         failed = Signal(str)
         finished_cleanly = Signal()
 
@@ -33,8 +36,9 @@ def run_gui(application) -> int:
 
         def run(self):
             try:
-                self.status_changed.emit("Cargando motores locales…")
+                self.status_changed.emit("Inicializando motores locales…")
                 pipe = self.app.create_pipeline()
+                self.initialization_finished.emit()
                 pipe.target_language = self.target_language
                 self.status_changed.emit("Capturando audio — ASR streaming…")
                 pipe.run(
@@ -74,11 +78,25 @@ def run_gui(application) -> int:
     show_original = QCheckBox("Mostrar texto original")
     show_original.setChecked(True)
 
+    font_size = QSpinBox()
+    font_size.setRange(10, 32)
+    font_size.setValue(14)
+    font_size.setSuffix(" px")
+    font_size.setToolTip("Tamaño de letra de la transcripción y traducción")
+
     output = QPlainTextEdit()
     output.setReadOnly(True)
     output.setPlaceholderText(
         "Reproduce una voz por los altavoces/auriculares de Windows y pulsa Iniciar…"
     )
+    output.setStyleSheet(f"font-size: {font_size.value()}px;")
+
+    initialization = QProgressBar()
+    initialization.setRange(0, 0)
+    initialization.setTextVisible(True)
+    initialization.setFormat("Inicializando motores locales…")
+    initialization.setVisible(False)
+    initialization.setMinimumHeight(22)
 
     start = QPushButton("Iniciar")
     stop = QPushButton("Detener")
@@ -88,6 +106,8 @@ def run_gui(application) -> int:
     row.addWidget(QLabel("Idioma destino:"))
     row.addWidget(target)
     row.addWidget(show_original)
+    row.addWidget(QLabel("Tamaño:"))
+    row.addWidget(font_size)
     row.addStretch()
     row.addWidget(start)
     row.addWidget(stop)
@@ -98,6 +118,7 @@ def run_gui(application) -> int:
         QLabel("Experimental: ASR streaming estabilizado Inglés ↔ Español")
     )
     layout.addWidget(status)
+    layout.addWidget(initialization)
     layout.addLayout(row)
     layout.addWidget(output)
     window.setCentralWidget(central)
@@ -106,9 +127,11 @@ def run_gui(application) -> int:
 
     def finish_session():
         status.setText("Detenido")
+        initialization.setVisible(False)
         start.setEnabled(True)
         stop.setEnabled(False)
         target.setEnabled(True)
+        font_size.setEnabled(True)
 
     def start_session():
         nonlocal worker
@@ -117,26 +140,15 @@ def run_gui(application) -> int:
 
         worker = Worker(application, target.currentData())
 
-        def append_translation(lang, translated, source, is_final):
-            target_code = target.currentData()
-            if not is_final:
-                status.setText(f"En vivo: {translated}")
-                return
-
-            if show_original.isChecked():
-                output.appendPlainText(
-                    f"[{lang} → {target_code}]\n"
-                    f"Original: {source}\n"
-                    f"Traducción: {translated}\n"
-                )
-            else:
-                output.appendPlainText(
-                    f"[{lang} → {target_code}]\n"
-                    f"{translated}\n"
-                )
+        initialization.setVisible(True)
+        initialization.setFormat("Inicializando motores locales…")
+        status.setText("Inicializando motores locales…")
 
         worker.translated.connect(append_translation)
         worker.status_changed.connect(status.setText)
+        worker.initialization_finished.connect(
+            lambda: initialization.setVisible(False)
+        )
         worker.failed.connect(lambda error: status.setText(f"Error: {error}"))
         worker.finished_cleanly.connect(finish_session)
         worker.start()
@@ -144,6 +156,25 @@ def run_gui(application) -> int:
         start.setEnabled(False)
         stop.setEnabled(True)
         target.setEnabled(False)
+        font_size.setEnabled(False)
+
+    def append_translation(lang, translated, source, is_final):
+        target_code = target.currentData()
+        if not is_final:
+            status.setText(f"En vivo: {translated}")
+            return
+
+        if show_original.isChecked():
+            output.appendPlainText(
+                f"[{lang} → {target_code}]\n"
+                f"Original: {source}\n"
+                f"Traducción: {translated}\n"
+            )
+        else:
+            output.appendPlainText(
+                f"[{lang} → {target_code}]\n"
+                f"{translated}\n"
+            )
 
     def stop_session():
         if worker is not None and worker.isRunning():
@@ -160,6 +191,11 @@ def run_gui(application) -> int:
 
     def clear_output():
         output.clear()
+
+    def change_font_size(value):
+        output.setStyleSheet(f"font-size: {value}px;")
+
+    font_size.valueChanged.connect(change_font_size)
 
     def close_event(event):
         if worker is not None and worker.isRunning():
