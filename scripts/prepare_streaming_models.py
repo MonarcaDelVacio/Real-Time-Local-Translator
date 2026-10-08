@@ -139,8 +139,7 @@ def main() -> None:
         package.install_from_path(match.download())
 
     (ROOT / "models" / ".ready").write_text(
-        "streaming models ready
-",
+        "streaming models ready\n",
         encoding="utf-8",
     )
     print("Local streaming models are ready.")
