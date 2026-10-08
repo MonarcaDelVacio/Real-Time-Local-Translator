@@ -9,7 +9,7 @@ Capturar el audio que reproduce el PC, detectar automáticamente el idioma habla
 ## Principios
 
 - **Gratis y local:** no requiere API de pago, cuenta, suscripción, créditos ni servidor externo.
-- **Offline durante el uso:** la compilación distribuida incluye los modelos locales preparados; no necesita Internet para transcribir o traducir.
+- **Offline durante el uso:** el instalador no incluye los modelos pesados; en el primer inicio verifica y descarga automáticamente los modelos y paquetes necesarios. Una vez preparados, la transcripción y traducción funcionan localmente sin Internet.
 - **Audio del sistema:** utiliza Windows WASAPI Loopback mediante SoundCard.
 - **Arquitectura reemplazable:** los motores están aislados detrás de contratos de dominio.
 - **Interfaz sin bloqueo:** Whisper y la captura se inicializan en un hilo de trabajo.
@@ -51,8 +51,8 @@ Incluye:
 - captura del audio de salida de Windows;
 - instalador Windows x64;
 - Python y dependencias incluidos;
-- modelos incluidos;
-- funcionamiento sin Internet después de la instalación.
+- modelos descargados automáticamente durante el primer inicio;
+- funcionamiento sin Internet después de completar la preparación inicial.
 
 La selección de más idiomas se ampliará después de validar correctamente audio, latencia, consumo y estabilidad en hardware Windows real.
 
@@ -60,9 +60,7 @@ La selección de más idiomas se ampliará después de validar correctamente aud
 
 La compilación Windows se genera mediante GitHub Actions. El instalador resultante se publica como artefacto del workflow. Hasta que el workflow termine correctamente, no debe considerarse un instalador validado.
 
-El instalador resultante es:
-
-`RealTimeLocalTranslatorSetup-0.3.1.exe`
+El instalador resultante usa el esquema de preparación inicial de la versión Experimental 0.4.2. El `.exe` no contiene los modelos pesados; estos se descargan en la carpeta de datos del usuario durante el primer inicio.
 
 El instalador no requiere Python.
 
@@ -70,13 +68,16 @@ El instalador no requiere Python.
 
 1. Instala el `.exe`.
 2. Inicia **Real-Time Local Translator**.
-3. Selecciona **Español** como destino.
-4. Reproduce una voz en inglés por los altavoces/auriculares de Windows.
-5. Pulsa **Iniciar**.
-6. Espera unos segundos para que aparezca el primer segmento.
-7. Pulsa **Detener**.
+3. Espera a que finalice la preparación inicial de modelos y dependencias. El botón **Iniciar** permanecerá desactivado mientras tanto.
+4. Selecciona **Español** como destino.
+5. Reproduce una voz en inglés por los altavoces/auriculares de Windows.
+6. Pulsa **Iniciar**.
+7. Espera unos segundos para que aparezca el primer segmento.
+8. Pulsa **Detener**.
 
 Después puedes probar el recorrido contrario seleccionando **English** y reproduciendo español.
+
+Si la preparación inicial falla, la aplicación muestra un cuadro de error con texto seleccionable y botón para copiarlo.
 
 ## Desarrollo
 
