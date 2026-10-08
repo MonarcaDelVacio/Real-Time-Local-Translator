@@ -19,10 +19,8 @@ def _build_pipeline():
     )
     from app.application.pipeline import TranslationPipeline
     from app.infrastructure.paths import project_root
-    from engines.asr.sherpa_streaming_engine import (
-        FasterWhisperSmallRefiner,
-        SherpaNemotronStreamingASR,
-    )
+    from engines.asr.faster_whisper_refiner import FasterWhisperRefiner
+    from engines.asr.sherpa_streaming_engine import SherpaNemotronStreamingASR
     from engines.audio.soundcard_backend import SoundCardSystemAudioSource
     from engines.translation.argos_engine import ArgosTranslationEngine
     from engines.vad.energy import EnergyVoiceActivityDetector
@@ -40,7 +38,7 @@ def _build_pipeline():
         provider=DEFAULT_ASR_PROVIDER,
         local_only=True,
     )
-    refiner = FasterWhisperSmallRefiner(
+    refiner = FasterWhisperRefiner(
         str(root / "models" / "whisper" / "small"),
         cpu_threads=DEFAULT_ASR_THREADS,
         local_only=True,
