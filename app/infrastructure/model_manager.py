@@ -30,6 +30,8 @@ def models_ready() -> bool:
     if not _complete(sherpa, SHERPA_REQUIRED) or not _complete(whisper, WHISPER_REQUIRED):
         return False
     try:
+        import os
+        os.environ["ARGOS_PACKAGES_DIR"] = str(root / "argos")
         import argostranslate.package as package
         installed = {(p.from_code, p.to_code) for p in package.get_installed_packages() if p.type == "translate"}
         return all(pair in installed for pair in ARGOS_REQUIRED)
