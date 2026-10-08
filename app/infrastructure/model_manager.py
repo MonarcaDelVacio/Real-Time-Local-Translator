@@ -41,6 +41,7 @@ def _complete(path: Path, names: tuple[str, ...]) -> bool:
 
 
 def models_ready() -> bool:
+    _ensure_gui_stdio()
     root = models_root()
     sherpa = root / "sherpa" / MODEL
     whisper = root / "whisper" / "small"
@@ -78,6 +79,7 @@ def _download_sherpa(destination: Path, status) -> None:
 
 def ensure_models(status=lambda _: None) -> None:
     """Verify every runtime model and repair missing/incomplete files online."""
+    _ensure_gui_stdio()
     root = models_root()
     root.mkdir(parents=True, exist_ok=True)
     sherpa = root / "sherpa" / MODEL
