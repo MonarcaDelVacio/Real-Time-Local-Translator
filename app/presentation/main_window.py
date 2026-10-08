@@ -98,7 +98,7 @@ def run_gui(application) -> int:
     """)
 
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.1")
+    window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.2")
     window.resize(1080, 720)
     window.setMinimumSize(820, 560)
 
