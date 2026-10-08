@@ -19,6 +19,16 @@ class ASREngine(ABC):
     @abstractmethod
     def transcribe(self, chunks: Iterable[AudioChunk]) -> Iterable[TranscriptSegment]: ...
 
+class StreamingASREngine(ASREngine):
+    """ASR engine that consumes live audio and returns partial/final text."""
+    @abstractmethod
+    def start_stream(self) -> None: ...
+    @abstractmethod
+    def accept_audio(self, chunk: AudioChunk) -> Iterable[TranscriptSegment]: ...
+    @abstractmethod
+    def finish_stream(self) -> Iterable[TranscriptSegment]: ...
+
+
 class LanguageDetector(ABC):
     @abstractmethod
     def detect(self, text: str) -> DetectedLanguage: ...
