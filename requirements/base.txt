@@ -1,8 +1,1 @@
-# Runtime dependencies. Processing is local/offline after installation.
-# Argos 1.11.1 keeps Stanza optional, avoiding the large PyTorch dependency.
-faster-whisper>=1.2,<2
-argostranslate @ git+https://github.com/argosopentech/argos-translate.git@17ed1a9b055c5ba1b51d76b683bbb0c64e2a4a88
-soundcard>=0.4.6,<0.5
-numpy>=1.26,<3
-# The application only needs Qt Essentials; the Addons bundle is unnecessary.
-PySide6-Essentials>=6.8,<7
+# Runtime dependencies. Processing is local/offline after installation.sherpa-onnx>=1.13.8,<1.14argostranslate @ git+https://github.com/argosopentech/argos-translate.git@17ed1a9b055c5ba1b51d76b683bbb0c64e2a4a88soundcard>=0.4.6,<0.5numpy>=1.26,<3PySide6-Essentials>=6.8,<7
