@@ -32,8 +32,8 @@ def _find_model_directory(root: Path) -> Path | None:
 
 def _download(archive: Path) -> None:
     print(f"Downloading {ARCHIVE_NAME} from the official Sherpa-ONNX release...")
-    # curl is preinstalled on GitHub's Windows runners and is more robust than
-    # urllib for the ~1.3 GB release asset (redirects, retries and resume).
+    # curl is preinstalled on GitHub Windows runners and handles GitHub release
+    # redirects/retries reliably for this large model archive.
     curl = shutil.which("curl.exe") or shutil.which("curl")
     if not curl:
         raise RuntimeError("curl.exe is required to download the Sherpa model.")
@@ -55,7 +55,9 @@ def _download(archive: Path) -> None:
     )
     size = archive.stat().st_size
     print(f"Downloaded archive size: {size / (1024 * 1024):.1f} MiB")
-    if size < 500_000_000:
+    # The current Nemotron archive is about 453 MiB compressed, so do not use
+    # an outdated 500 MB lower bound. A very small file still indicates failure.
+    if size < 50_000_000:
         raise RuntimeError("Downloaded Sherpa archive is unexpectedly small or incomplete.")
 
 
@@ -69,7 +71,7 @@ def _extract(archive: Path, model_root: Path) -> Path:
             "Sherpa archive extracted successfully, but the expected ONNX files "
             "could not be found. Archive layout did not match the expected model."
         )
-    model_dir = model_root / EXTRACTED_DIR
+    model_dir = model_root / MODEL
     if found.resolve() != model_dir.resolve():
         if model_dir.exists():
             shutil.rmtree(model_dir)
