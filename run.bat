@@ -55,15 +55,9 @@ if errorlevel 1 (
 echo [OK] Local Python environment works.
 echo.
 
-echo [3/5] Installing/updating application dependencies...
-echo This can take several minutes on the first run.
+echo [3/5] Checking/installing application dependencies...
+echo First run may take a few minutes. Completed packages are reused.
 echo.
-
-"%VENV_PY%" -m pip install --upgrade pip
-if errorlevel 1 (
-    echo [ERROR] pip could not be updated.
-    goto :FAIL
-)
 
 "%VENV_PY%" -m pip install -r "requirements\base.txt"
 if errorlevel 1 (
@@ -78,7 +72,7 @@ echo [OK] Runtime dependencies installed.
 echo.
 
 echo [4/5] Checking local application imports...
-"%VENV_PY%" -c "import PySide6, numpy, soundcard, faster_whisper, argostranslate; print('All runtime imports OK.')"
+"%VENV_PY%" -c "import PySide6, numpy, soundcard, faster_whisper, argostranslate; from PySide6 import QtWidgets; print('All runtime imports OK.')"
 if errorlevel 1 (
     echo [ERROR] One or more application dependencies cannot be imported.
     goto :FAIL
