@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 
-from app.application.service import TranslatorApplication
-
 
 def _build_pipeline():
     from config.defaults import (
-        DEFAULT_ASR_COMPUTE_TYPE,
-        DEFAULT_ASR_DEVICE,
         DEFAULT_ASR_MODEL,
+        DEFAULT_ASR_PROVIDER,
+        DEFAULT_ASR_THREADS,
         DEFAULT_AUDIO_BLOCK_FRAMES,
         DEFAULT_CHANNELS,
         DEFAULT_MAX_BUFFER_CHUNKS,
@@ -18,25 +16,24 @@ def _build_pipeline():
         DEFAULT_SILENCE_CHUNKS,
         DEFAULT_TARGET_LANGUAGE,
     )
-    from app.infrastructure.paths import project_root, whisper_model_path
+    from app.application.pipeline import TranslationPipeline
+    from app.infrastructure.paths import project_root
+    from engines.asr.sherpa_streaming_engine import SherpaNemotronStreamingASR
     from engines.audio.soundcard_backend import SoundCardSystemAudioSource
-    from engines.asr.faster_whisper_engine import FasterWhisperASR
     from engines.translation.argos_engine import ArgosTranslationEngine
     from engines.vad.energy import EnergyVoiceActivityDetector
-    from app.application.pipeline import TranslationPipeline
 
     root = project_root()
     os.environ.setdefault("ARGOS_PACKAGES_DIR", str(root / "models" / "argos"))
     os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
 
-    model_path = whisper_model_path(DEFAULT_ASR_MODEL)
     source = SoundCardSystemAudioSource(
         DEFAULT_SAMPLE_RATE, DEFAULT_CHANNELS, DEFAULT_AUDIO_BLOCK_FRAMES
     )
-    asr = FasterWhisperASR(
-        str(model_path),
-        DEFAULT_ASR_DEVICE,
-        DEFAULT_ASR_COMPUTE_TYPE,
+    asr = SherpaNemotronStreamingASR(
+        str(root / "models" / "sherpa" / DEFAULT_ASR_MODEL),
+        num_threads=DEFAULT_ASR_THREADS,
+        provider=DEFAULT_ASR_PROVIDER,
         local_only=True,
     )
     return TranslationPipeline(
@@ -51,10 +48,7 @@ def _build_pipeline():
     )
 
 
-def build_application() -> TranslatorApplication:
-    """Build the lightweight application shell.
+def build_application():
+    from app.application.service import TranslatorApplication
 
-    ML/audio engines are intentionally lazy: opening the GUI must not load
-    Whisper or initialize WASAPI on the GUI thread.
-    """
     return TranslatorApplication(pipeline_factory=_build_pipeline)
