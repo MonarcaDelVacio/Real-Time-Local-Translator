@@ -9,7 +9,7 @@ if (-not (Test-Path $python)) {
 
 Write-Host "Preparing local model set if necessary..."
 if (-not (Test-Path "models\.ready")) {
-    & $python scripts/prepare_local_models.py
+    & $python scripts/prepare_streaming_models.py
     if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
 } else {
     Write-Host "Local model readiness marker found."
