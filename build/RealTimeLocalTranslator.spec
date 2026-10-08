@@ -13,7 +13,7 @@ hiddenimports = []
 if __import__("os").environ.get("RTL_BUNDLE_MODELS") == "1":
     datas.append((str(ROOT / "models"), "models"))
 
-for package_name in ("sherpa_onnx", "faster_whisper", "ctranslate2", "argostranslate", "soundcard", "numpy", "PySide6"):
+for package_name in ("sherpa_onnx", "faster_whisper", "ctranslate2", "argostranslate", "soundcard", "numpy", "PySide6", "huggingface_hub"):
     d, b, h = collect_all(package_name)
     datas += d
     binaries += b
