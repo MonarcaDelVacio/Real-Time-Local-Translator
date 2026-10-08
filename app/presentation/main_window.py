@@ -108,7 +108,6 @@ def run_gui(application) -> int:
         start.setEnabled(True)
         stop.setEnabled(False)
         target.setEnabled(True)
-        show_original.setEnabled(True)
 
     def start_session():
         nonlocal worker
@@ -140,7 +139,6 @@ def run_gui(application) -> int:
         start.setEnabled(False)
         stop.setEnabled(True)
         target.setEnabled(False)
-        show_original.setEnabled(False)
 
     def stop_session():
         if worker is not None and worker.isRunning():
