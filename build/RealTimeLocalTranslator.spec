@@ -4,9 +4,14 @@ from PyInstaller.utils.hooks import collect_all
 
 ROOT = Path(SPEC).resolve().parent.parent
 
-datas = [(str(ROOT / "models"), "models")]
+datas = []
 binaries = []
 hiddenimports = []
+
+# Developer/test builds stay small and reuse models stored outside the executable.
+# Set RTL_BUNDLE_MODELS=1 for a self-contained installer build.
+if __import__("os").environ.get("RTL_BUNDLE_MODELS") == "1":
+    datas.append((str(ROOT / "models"), "models"))
 
 for package_name in ("sherpa_onnx", "faster_whisper", "ctranslate2", "argostranslate", "soundcard", "numpy", "PySide6"):
     d, b, h = collect_all(package_name)
