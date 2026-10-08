@@ -7,6 +7,7 @@ def run_gui(application) -> int:
     from PySide6.QtCore import QThread, Signal
     from PySide6.QtWidgets import (
         QApplication,
+        QCheckBox,
         QComboBox,
         QHBoxLayout,
         QLabel,
@@ -55,7 +56,7 @@ def run_gui(application) -> int:
 
     app = QApplication.instance() or QApplication([])
     window = QMainWindow()
-    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.1")
+    window.setWindowTitle("Real-Time Local Translator — Preview 0.3.2")
     window.resize(1000, 700)
 
     central = QWidget()
@@ -68,6 +69,9 @@ def run_gui(application) -> int:
     target = QComboBox()
     target.addItem("Español", "es")
     target.addItem("English", "en")
+
+    show_original = QCheckBox("Mostrar texto original")
+    show_original.setChecked(True)
 
     output = QPlainTextEdit()
     output.setReadOnly(True)
@@ -82,6 +86,7 @@ def run_gui(application) -> int:
     row = QHBoxLayout()
     row.addWidget(QLabel("Idioma destino:"))
     row.addWidget(target)
+    row.addWidget(show_original)
     row.addStretch()
     row.addWidget(start)
     row.addWidget(stop)
@@ -103,6 +108,7 @@ def run_gui(application) -> int:
         start.setEnabled(True)
         stop.setEnabled(False)
         target.setEnabled(True)
+        show_original.setEnabled(True)
 
     def start_session():
         nonlocal worker
@@ -110,11 +116,22 @@ def run_gui(application) -> int:
             return
 
         worker = Worker(application, target.currentData())
-        worker.translated.connect(
-            lambda lang, translated, source: output.appendPlainText(
-                f"[{lang} → {target.currentData()}]\nOriginal: {source}\nTraducción: {translated}\n"
-            )
-        )
+
+        def append_translation(lang, translated, source):
+            target_code = target.currentData()
+            if show_original.isChecked():
+                output.appendPlainText(
+                    f"[{lang} → {target_code}]\n"
+                    f"Original: {source}\n"
+                    f"Traducción: {translated}\n"
+                )
+            else:
+                output.appendPlainText(
+                    f"[{lang} → {target_code}]\n"
+                    f"{translated}\n"
+                )
+
+        worker.translated.connect(append_translation)
         worker.status_changed.connect(status.setText)
         worker.failed.connect(lambda error: status.setText(f"Error: {error}"))
         worker.finished_cleanly.connect(finish_session)
@@ -123,6 +140,7 @@ def run_gui(application) -> int:
         start.setEnabled(False)
         stop.setEnabled(True)
         target.setEnabled(False)
+        show_original.setEnabled(False)
 
     def stop_session():
         if worker is not None and worker.isRunning():
