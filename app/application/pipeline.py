@@ -234,6 +234,7 @@ class TranslationPipeline:
                             self.refiner is not None
                             and not truncated
                             and not stop_requested()
+                            and not capture_errors
                         ):
                             try:
                                 refined = list(self.refiner.refine(audio, source_language))
