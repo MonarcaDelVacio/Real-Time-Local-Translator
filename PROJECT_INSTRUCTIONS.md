@@ -1,7 +1,7 @@
 # Real-Time Local Translator — Project Instructions
 
 ## Objective
-Build a professional Windows desktop application that captures meeting/system audio, transcribes speech locally in real time, detects the spoken language, and translates it into a user-selected language.
+Long-term goal: build a professional Windows desktop application that captures meeting/system audio, transcribes speech locally in real time, detects the spoken language, and translates it into a user-selected language. Keep the implemented scope and the long-term goal clearly distinguished in code and documentation.
 
 The application must be free, unlimited in normal local use, local-first, usable offline after required models are installed, modular, maintainable, and extensible.
 
@@ -13,17 +13,18 @@ Use four logical layers:
 - **Infrastructure:** concrete OS, audio, ASR, VAD, translation and storage integrations.
 
 Preferred flow:
-`Audio Source → Buffer → VAD → ASR → Language Detection → Transcript → Translation → Session → UI`
+`Audio Source → Bounded Buffer → Streaming ASR → Final Refinement → Source-Language Selection/Detection → Transcript → Translation → UI`
 
 The UI must never directly control faster-whisper, Argos Translate, WASAPI, VAD libraries, or other third-party engines.
 
 ## Initial technology
 - Python 3.11+
 - PySide6
-- faster-whisper
+- sherpa-onnx / Nemotron for live ASR
+- faster-whisper for final refinement
 - Argos Translate
 - Windows audio capture through an abstraction capable of using WASAPI
-- Silero VAD or another suitable local VAD
+- current energy-based VAD; evaluate neural VAD separately
 - pytest
 - PyInstaller
 - Inno Setup
@@ -43,6 +44,16 @@ External engines must remain behind replaceable interfaces.
 - Avoid broad refactors without a concrete reason.
 - New functionality must preserve existing behavior.
 - Keep documentation synchronized with architectural changes.
+
+## Current implemented scope — Experimental 0.4.2
+
+- The current UI supports English → Spanish and Spanish → English only.
+- In the streaming path, the selected target language determines the expected source language. Do not describe this as universal automatic language detection.
+- Nemotron/Sherpa-ONNX provides provisional live text; Whisper Small refines finalized utterances.
+- The capture queue is bounded. When overloaded, old audio may be dropped to prevent unbounded latency; long-session stress tests remain required.
+- Installed builds store writable model assets under the user's local application data directory. Optional bundled models must be copied there before use.
+- Current model sources are mixed: Sherpa/Nemotron from GitHub Releases, Whisper Small from Hugging Face, and Argos packages from the Argos package index. Do not claim all model files come from this project's GitHub repository until a release-asset mirror is implemented.
+- CI success verifies automated tests and packaging only. It does not certify audio-device compatibility, latency, or accuracy on real hardware.
 
 ## Privacy
 Audio, transcripts, and translations remain local by default. The application must never silently upload meeting content.
