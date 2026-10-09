@@ -169,24 +169,34 @@ class TranslationPipeline:
 
         # Audio capture runs independently from ASR/Whisper. Refinement can take
         # several seconds, so it must not stop the device from being read.
-        audio_queue: queue.Queue = queue.Queue(maxsize=max(128, self.max_buffer_chunks * 2))
+        # Keep only a short audio backlog. A large queue hides overload by
+        # translating increasingly old audio, making latency grow throughout a session.
+        # At 16 kHz / 2048 frames, 32 chunks represent about 4 seconds.
+        audio_queue: queue.Queue = queue.Queue(maxsize=32)
         sentinel = object()
         producer_stop = threading.Event()
+        audio_discontinuity = threading.Event()
         capture_errors: list[Exception] = []
 
         def capture_audio() -> None:
             try:
                 while not producer_stop.is_set() and not stop_requested():
                     chunk = self.source.read()
-                    while True:
+                    try:
+                        audio_queue.put(chunk, timeout=0.02)
+                    except queue.Full:
+                        # Prefer recent audio over stale audio. Mark the gap so the
+                        # consumer resets the streaming decoder before continuing.
                         try:
-                            audio_queue.put(chunk, timeout=0.1)
-                            break
+                            audio_queue.get_nowait()
+                        except queue.Empty:
+                            pass
+                        try:
+                            audio_queue.put_nowait(chunk)
+                            audio_discontinuity.set()
                         except queue.Full:
-                            # Back-pressure is bounded. On abnormal consumer
-                            # shutdown, allow the producer to exit cleanly.
-                            if producer_stop.is_set():
-                                return
+                            # The consumer raced us; the next capture iteration retries.
+                            audio_discontinuity.set()
             except Exception as exc:
                 capture_errors.append(exc)
             finally:
@@ -205,6 +215,8 @@ class TranslationPipeline:
             daemon=True,
         )
         producer.start()
+        last_preview_at = 0.0
+        last_preview_text = ""
         try:
             while True:
                 try:
@@ -215,6 +227,15 @@ class TranslationPipeline:
                     continue
                 if item is sentinel:
                     break
+
+                # A dropped queue chunk creates a gap in the waveform. Reset the
+                # decoder and retained refinement audio rather than treating the
+                # separated samples as continuous speech.
+                if audio_discontinuity.is_set():
+                    audio_discontinuity.clear()
+                    engine.start_stream()
+                    self._speech.clear()
+                    self._stream_audio_truncated = False
 
                 chunk = item
                 segments = list(engine.accept_audio(chunk))
@@ -244,12 +265,22 @@ class TranslationPipeline:
                                     on_error(exc)
                         self._translate_segments(final_segments, on_translation, on_error)
                     elif segment.text.strip():
-                        # Translate each updated streaming hypothesis immediately.
-                        # The UI treats non-final segments as a replaceable live
-                        # preview, so cumulative hypotheses do not pollute history.
-                        self._translate_segments(
-                            [segment], on_translation, on_error
-                        )
+                        # Argos translation is synchronous. Translating every ASR
+                        # revision can consume more time than the audio arriving and
+                        # starve the decoder. Refresh the provisional preview at most
+                        # about 3 times per second; final segments are never throttled.
+                        import time
+
+                        now = time.monotonic()
+                        if (
+                            segment.text != last_preview_text
+                            and now - last_preview_at >= 0.35
+                        ):
+                            last_preview_at = now
+                            last_preview_text = segment.text
+                            self._translate_segments(
+                                [segment], on_translation, on_error
+                            )
 
             stopping = stop_requested() or bool(capture_errors)
             finals = list(engine.finish_stream())
