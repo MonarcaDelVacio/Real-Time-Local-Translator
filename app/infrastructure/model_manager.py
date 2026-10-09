@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 
 from app.infrastructure.paths import models_root
 
-MODEL = "nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11"
+MODEL = "nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11"
 WHISPER_MODEL = "Systran/faster-whisper-small"
 SHERPA_ARCHIVE = f"sherpa-onnx-{MODEL}.tar.bz2"
 SHERPA_URL = (
