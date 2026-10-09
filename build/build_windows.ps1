@@ -13,7 +13,7 @@ if (-not (Test-Path $python)) {
 
 if ($IncludeModels) {
     Write-Host "Preparing local model set for a self-contained build..."
-    $requiredWhisper = @("config.json", "model.bin", "tokenizer.json", "vocabulary.txt")
+    $requiredWhisper = @("config.json", "model.bin", "tokenizer.json", "vocabulary.txt", "preprocessor_config.json")
     $whisperReady = Test-Path "models\.ready"
     foreach ($name in $requiredWhisper) {
         if (-not (Test-Path ("models\whisper\small\" + $name))) { $whisperReady = $false }
