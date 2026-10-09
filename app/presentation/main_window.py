@@ -503,11 +503,12 @@ def run_gui(application) -> int:
 
     def stop_session():
         if worker is not None and worker.isRunning():
+            # Do not block the GUI thread while audio/ASR cleanup completes.
+            # Worker.finished_cleanly will restore controls when the thread exits.
             worker.stop()
-            status.setText("●  Deteniendo…")
-            if not worker.wait(5000):
-                QMessageBox.warning(window, "Cierre pendiente", "El motor todavía está finalizando la captura. Espera unos segundos.")
-                return
+            status.setText("●  Deteniendo captura y finalizando el texto pendiente…")
+            stop.setEnabled(False)
+            return
         finish_session()
 
     def clear_output():
