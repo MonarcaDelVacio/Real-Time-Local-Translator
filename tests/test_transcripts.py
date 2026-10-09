@@ -25,4 +25,4 @@ def test_transcript_paragraph_separator_handles_utf8_ellipsis(tmp_path):
     append_transcript_text(path, "La frase terminó…")
     append_transcript_text(path, "Siguiente frase")
 
-    assert path.read_text(encoding="utf-8") == "La frase terminó…\\n\\nSiguiente frase"
+    assert path.read_text(encoding="utf-8") == "La frase terminó…\n\nSiguiente frase"
