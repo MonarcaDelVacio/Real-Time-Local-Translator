@@ -597,6 +597,19 @@ def run_gui(application) -> int:
 
     def close_event(event):
         save_preferences()
+        # The first-run model worker may still be downloading/extracting large
+        # files. Destroying its QThread wrapper while it runs can crash Qt.
+        # Keep the window alive until preparation finishes; the user can still
+        # switch to other applications because the setup dialog is non-modal.
+        if setup_worker is not None and setup_worker.isRunning():
+            QMessageBox.warning(
+                window,
+                "Preparación en curso",
+                "La descarga o reparación de modelos todavía está en curso. "
+                "Espera a que termine antes de cerrar la aplicación.",
+            )
+            event.ignore()
+            return
         if worker is not None and worker.isRunning():
             worker.stop()
             if not worker.wait(5000):
