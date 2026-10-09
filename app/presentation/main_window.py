@@ -706,6 +706,16 @@ def run_gui(application) -> int:
             show_error_dialog("No se pudieron preparar los modelos", error)
         setup_worker.finished_ok.connect(setup_finished)
         setup_worker.failed.connect(setup_failed)
+
+        def restore_window_topmost(_result):
+            # Setup temporarily releases the main window's topmost flag. Restore
+            # the current preference only after the progress dialog has closed.
+            desired = always_on_top_box.isChecked()
+            window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, desired)
+            window.show()
+
+        setup_dialog.finished.connect(restore_window_topmost)
+
         # The main window normally honors the user's always-on-top preference.
         # Temporarily release that flag during setup so other apps can be brought forward.
         if always_on_top:
