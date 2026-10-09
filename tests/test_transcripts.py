@@ -16,4 +16,4 @@ def test_transcript_starts_new_paragraph_after_sentence(tmp_path):
     append_transcript_text(path, "First sentence.")
     append_transcript_text(path, "Second sentence!")
 
-    assert path.read_text(encoding="utf-8") == "First sentence.\\n\\nSecond sentence!"
+    assert path.read_text(encoding="utf-8") == "First sentence.\n\nSecond sentence!"
