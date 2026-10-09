@@ -1,147 +1,25 @@
-from pathlib import Path
+"""Compatibility entry point for preparing runtime models during development/builds.
+
+All download, repair and validation logic lives in app.infrastructure.model_manager
+so the player installer and developer tools cannot drift apart.
+"""
+from __future__ import annotations
+
 import os
-import shutil
-import subprocess
-import tarfile
+import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = "nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11"
-WHISPER_MODEL = "Systran/faster-whisper-small"
-ARCHIVE_NAME = f"sherpa-onnx-{MODEL}.tar.bz2"
-URL = (
-    "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
-    f"asr-models/{ARCHIVE_NAME}"
-)
-REQUIRED_NAMES = (
-    "encoder.int8.onnx",
-    "decoder.int8.onnx",
-    "joiner.int8.onnx",
-    "tokens.txt",
-)
-WHISPER_REQUIRED_NAMES = (
-    "config.json",
-    "model.bin",
-    "tokenizer.json",
-    "vocabulary.txt",
-)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-
-def _required(directory: Path) -> list[Path]:
-    return [directory / name for name in REQUIRED_NAMES]
-
-
-def _find_model_directory(root: Path) -> Path | None:
-    direct = root / MODEL
-    if all(p.is_file() for p in _required(direct)):
-        return direct
-    for tokens in root.rglob("tokens.txt"):
-        candidate = tokens.parent
-        if all(p.is_file() for p in _required(candidate)):
-            return candidate
-    return None
-
-
-def _download(archive: Path) -> None:
-    print(f"Downloading {ARCHIVE_NAME} from the official Sherpa-ONNX release...")
-    curl = shutil.which("curl.exe") or shutil.which("curl")
-    if not curl:
-        raise RuntimeError("curl.exe is required to download the Sherpa model.")
-    if archive.exists():
-        archive.unlink()
-    subprocess.run(
-        [
-            curl, "--fail", "--location", "--retry", "5",
-            "--retry-delay", "5", "--retry-all-errors",
-            "--continue-at", "-", "--output", str(archive), URL,
-        ],
-        check=True,
-    )
-    size = archive.stat().st_size
-    print(f"Downloaded archive size: {size / (1024 * 1024):.1f} MiB")
-    if size < 50_000_000:
-        raise RuntimeError("Downloaded Sherpa archive is unexpectedly small or incomplete.")
-
-
-def _extract(archive: Path, model_root: Path) -> Path:
-    print("Extracting Sherpa streaming model...")
-    with tarfile.open(archive, "r:bz2") as tar:
-        tar.extractall(model_root)
-    found = _find_model_directory(model_root)
-    if found is None:
-        raise RuntimeError(
-            "Sherpa archive extracted successfully, but the expected ONNX files could not be found."
-        )
-    model_dir = model_root / MODEL
-    if found.resolve() != model_dir.resolve():
-        if model_dir.exists():
-            shutil.rmtree(model_dir)
-        shutil.copytree(found, model_dir)
-    return model_dir
+os.environ.setdefault("RTL_MODELS_DIR", str(ROOT / "models"))
 
 
 def main() -> None:
-    model_root = ROOT / "models" / "sherpa"
-    model_dir = model_root / MODEL
-    model_root.mkdir(parents=True, exist_ok=True)
+    from app.infrastructure.model_manager import ensure_models
 
-    if not all(p.is_file() for p in _required(model_dir)):
-        archive = model_root / ARCHIVE_NAME
-        try:
-            _download(archive)
-            _extract(archive, model_root)
-        finally:
-            archive.unlink(missing_ok=True)
-
-    if not all(p.is_file() for p in _required(model_dir)):
-        raise RuntimeError("Sherpa streaming model is incomplete after extraction.")
-    print("Sherpa model files validated.")
-
-    whisper_root = ROOT / "models" / "whisper" / "small"
-    whisper_root.mkdir(parents=True, exist_ok=True)
-    if not all((whisper_root / name).is_file() for name in WHISPER_REQUIRED_NAMES):
-        print(f"Downloading complete local Whisper refinement model: {WHISPER_MODEL}...")
-        from huggingface_hub import snapshot_download
-        snapshot_download(
-            repo_id=WHISPER_MODEL,
-            local_dir=str(whisper_root),
-            allow_patterns=list(WHISPER_REQUIRED_NAMES),
-        )
-    missing = [
-        name for name in WHISPER_REQUIRED_NAMES
-        if not (whisper_root / name).is_file()
-    ]
-    if missing:
-        raise RuntimeError(
-            "Whisper refinement model is incomplete after download; missing: "
-            + ", ".join(missing)
-        )
-    print("Whisper refinement model validated.")
-
-    os.environ["ARGOS_PACKAGES_DIR"] = str(ROOT / "models" / "argos")
-    import argostranslate.package as package
-
-    package.update_package_index()
-    available = package.get_available_packages()
-    wanted = {("en", "es"), ("es", "en")}
-    installed = {
-        (p.from_code, p.to_code)
-        for p in package.get_installed_packages()
-        if p.type == "translate"
-    }
-    for src, dst in wanted - installed:
-        match = next(
-            (p for p in available if p.from_code == src and p.to_code == dst),
-            None,
-        )
-        if match is None:
-            raise RuntimeError(f"Argos package unavailable: {src}->{dst}")
-        print(f"Installing Argos {src}->{dst}...")
-        package.install_from_path(match.download())
-
-    (ROOT / "models" / ".ready").write_text(
-        "streaming models ready\n",
-        encoding="utf-8",
-    )
+    ensure_models(lambda message: print(message, flush=True))
     print("Local streaming models are ready.")
 
 
