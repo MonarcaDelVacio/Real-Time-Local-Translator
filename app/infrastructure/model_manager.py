@@ -139,6 +139,16 @@ def _argos_installed_pairs(root: Path) -> set[tuple[str, str]]:
     }
 
 
+def _argos_translations_ready(root: Path) -> bool:
+    _argos_installed_pairs(root)
+    from argostranslate import translate
+
+    return all(
+        translate.get_translation_from_codes(source, target) is not None
+        for source, target in ARGOS_REQUIRED
+    )
+
+
 def models_ready() -> bool:
     _ensure_gui_stdio()
     root = models_root()
@@ -151,7 +161,7 @@ def models_ready() -> bool:
         # Catch partial/corrupt JSON before enabling the Start button.
         json.loads((whisper / "config.json").read_text(encoding="utf-8"))
         json.loads((whisper / "preprocessor_config.json").read_text(encoding="utf-8"))
-        return set(ARGOS_REQUIRED).issubset(_argos_installed_pairs(root))
+        return _argos_translations_ready(root)
     except Exception:
         return False
 
@@ -211,6 +221,11 @@ def ensure_models(status=lambda _: None) -> None:
     missing_pairs = [f"{src}->{dst}" for src, dst in ARGOS_REQUIRED if (src, dst) not in installed]
     if missing_pairs:
         raise RuntimeError("Paquetes Argos faltantes o incompletos: " + ", ".join(missing_pairs))
+    try:
+        if not _argos_translations_ready(root):
+            raise RuntimeError("Argos no pudo cargar todos los motores de traducción instalados.")
+    except Exception as exc:
+        raise RuntimeError(f"Los paquetes Argos están instalados, pero no son utilizables: {exc}") from exc
 
     (root / ".ready").write_text("runtime models ready\n", encoding="utf-8")
     status("Todos los modelos y paquetes locales están listos.")
