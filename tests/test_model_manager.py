@@ -117,7 +117,7 @@ def test_assets_complete_rejects_nonempty_but_truncated_model_file(tmp_path):
 def test_huggingface_progress_is_forwarded_to_setup_status():
     messages = []
     progress_type = _status_tqdm_class(messages.append)
-    progress = progress_type(total=100, disable=True)
+    progress = progress_type(total=100, file=io.StringIO(), mininterval=0, leave=False)
     try:
         progress.update(25)
         progress.update(25)
