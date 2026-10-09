@@ -194,8 +194,12 @@ class TranslationPipeline:
                             )
                         )
 
+            # Stopping is a user-requested fast path: do not launch a second,
+            # potentially expensive Whisper pass over the entire buffered session.
+            # finish_stream() still flushes any text already decoded by streaming ASR.
+            stopping = stop_requested()
             finals = list(engine.finish_stream())
-            if self._speech and self.refiner is not None:
+            if self._speech and self.refiner is not None and not stopping:
                 try:
                     refined = list(self.refiner.refine(self._speech, source_language))
                     if refined:
