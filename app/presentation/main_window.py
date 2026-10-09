@@ -491,17 +491,22 @@ def run_gui(application) -> int:
                 folder.mkdir(parents=True, exist_ok=True)
                 if transcript_path is None:
                     transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
-                    transcript_path.write_text(
-                        "Transcripción original — Real-Time Local Translator\\n"
-                        f"Sesión iniciada: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
-                        "El contenido de este archivo se guarda localmente en el equipo.\\n\\n",
-                        encoding="utf-8",
-                    )
-                with transcript_path.open("a", encoding="utf-8") as transcript_file:
-                    transcript_file.write(
-                        f"[{datetime.now().strftime('%H:%M:%S')}] "
-                        f"[{(lang or 'auto').upper()}] {source.strip()}\\n"
-                    )
+                    transcript_path.write_text("", encoding="utf-8")
+                # Save only the recognized words. Join sentence fragments with
+                # spaces and start a new paragraph when the previous fragment
+                # already ends a sentence; never add timestamps or metadata.
+                clean_text = " ".join(source.split())
+                if clean_text:
+                    with transcript_path.open("a+", encoding="utf-8") as transcript_file:
+                        transcript_file.seek(0, os.SEEK_END)
+                        file_size = transcript_file.tell()
+                        separator = ""
+                        if file_size:
+                            transcript_file.seek(file_size - 1)
+                            last_char = transcript_file.read(1)
+                            separator = "\\n\\n" if last_char in ".!?…" else " "
+                        transcript_file.seek(0, os.SEEK_END)
+                        transcript_file.write(separator + clean_text)
             except OSError as exc:
                 # A disk/permission problem must not discard the translation or
                 # crash the GUI slot; surface the save failure instead.
