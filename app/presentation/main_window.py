@@ -205,6 +205,14 @@ def run_gui(application) -> int:
     initialization.setVisible(False)
     initialization.setMinimumHeight(22)
 
+    live_preview = QLabel("")
+    live_preview.setWordWrap(True)
+    live_preview.setVisible(False)
+    live_preview.setStyleSheet(
+        "QLabel { background: #17243a; color: #bfdbfe; border: 1px solid #2b4264; "
+        "border-radius: 8px; padding: 10px 12px; font-weight: 600; }"
+    )
+
     output = QTextEdit()
     output.setReadOnly(True)
     output.setAcceptRichText(True)
@@ -218,6 +226,7 @@ def run_gui(application) -> int:
     layout.addWidget(statusbar)
     layout.addWidget(initialization)
     layout.addWidget(toolbar)
+    layout.addWidget(live_preview)
     layout.addWidget(output, 1)
     window.setCentralWidget(central)
 
@@ -321,9 +330,15 @@ def run_gui(application) -> int:
 
     def append_translation(lang, translated, source, is_final):
         if not is_final:
-            status.setText(f"●  En vivo: {translated}")
+            # Streaming ASR hypotheses are provisional and are not translated yet.
+            # Show them visibly instead of hiding them in the small status bar.
+            live_preview.setText(f"🎙 Reconocimiento en vivo (provisional): {translated}")
+            live_preview.setVisible(True)
+            status.setText("●  Reconociendo voz… la traducción aparecerá al terminar la frase")
             return
 
+        live_preview.clear()
+        live_preview.setVisible(False)
         from html import escape
 
         if show_original.isChecked():
