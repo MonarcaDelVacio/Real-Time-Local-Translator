@@ -574,8 +574,9 @@ def run_gui(application) -> int:
 
         setup_dialog = QDialog(window)
         setup_dialog.setWindowTitle("Preparación inicial")
-        setup_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        setup_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        # Preparation may download hundreds of megabytes. Keep this progress
+        # window non-modal and not topmost so users can work in other applications.
+        setup_dialog.setWindowModality(Qt.WindowModality.NonModal)
         setup_dialog.setMinimumWidth(520)
         setup_dialog.resize(560, 270)
         setup_dialog.setStyleSheet("""
@@ -649,6 +650,11 @@ def run_gui(application) -> int:
             show_error_dialog("No se pudieron preparar los modelos", error)
         setup_worker.finished_ok.connect(setup_finished)
         setup_worker.failed.connect(setup_failed)
+        # The main window normally honors the user's always-on-top preference.
+        # Temporarily release that flag during setup so other apps can be brought forward.
+        if always_on_top:
+            window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+            window.show()
         setup_dialog.show()
         setup_worker.start()
 
