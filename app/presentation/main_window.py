@@ -58,7 +58,8 @@ def run_gui(application) -> int:
                 ensure_models(self.status_changed.emit)
                 self.finished_ok.emit()
             except Exception as exc:
-                self.failed.emit(str(exc))
+                import traceback
+                self.failed.emit(f"{exc}\n\n{traceback.format_exc()}")
 
     class Worker(QThread):
         translated = Signal(str, str, str, bool)
@@ -99,8 +100,9 @@ def run_gui(application) -> int:
                     lambda segment: self.transcript.emit(segment.text),
                 )
             except Exception as exc:
-                self.error_message = str(exc)
-                self.failed.emit(self.error_message)
+                import traceback
+                self.error_message = f"{exc}\n\n{traceback.format_exc()}"
+                self.failed.emit(str(exc))
             finally:
                 self.finished_cleanly.emit()
 
@@ -477,7 +479,7 @@ def run_gui(application) -> int:
         def handle_worker_finished():
             finish_session()
             if worker is not None and worker.error_message:
-                status.setText(f"●  Error: {worker.error_message}")
+                status.setText(f"●  Error: {worker.error_message.splitlines()[0]}")
                 show_error_dialog("No se pudo iniciar o continuar", worker.error_message)
             elif worker is not None and worker.last_reported_error:
                 status.setText(f"●  Error durante la captura: {worker.last_reported_error}")
@@ -695,32 +697,58 @@ def run_gui(application) -> int:
 
         setup_button = QPushButton("Continuar")
         setup_button.setVisible(False)
-        setup_button.clicked.connect(setup_dialog.accept)
         setup_layout.addWidget(setup_button, 0, Qt.AlignmentFlag.AlignRight)
 
-        setup_worker = ModelSetupWorker()
-        window._setup_worker = setup_worker
+        setup_failed_state = {"value": False}
         window._setup_dialog = setup_dialog
-        setup_worker.status_changed.connect(lambda value: (setup_stage.setText(value), status.setText("●  " + value)))
+
         def setup_finished():
+            setup_failed_state["value"] = False
+            setup_progress.setVisible(True)
             setup_progress.setRange(0, 100)
             setup_progress.setValue(100)
             setup_stage.setText("¡Todo listo! La aplicación ya está preparada para usarse.")
             setup_note.setText("Los modelos y las dependencias están instalados localmente. Pulsa «Continuar» y luego «Iniciar».")
+            setup_button.setText("Continuar")
             setup_button.setVisible(True)
             start.setEnabled(True)
             status.setText("●  Listo · modelos verificados")
+
         def setup_failed(error):
+            setup_failed_state["value"] = True
             setup_progress.setVisible(False)
             setup_stage.setText("No se pudo completar la preparación.")
-            setup_note.setText("Corrige el problema y vuelve a abrir la aplicación. Puedes copiar el mensaje de error para compartirlo.")
-            setup_button.setText("Cerrar")
+            setup_note.setText("Comprueba la conexión y vuelve a intentarlo. También puedes copiar el error para compartirlo.")
+            setup_button.setText("Reintentar")
             setup_button.setVisible(True)
             status.setText("●  Error al preparar modelos")
             show_error_dialog("No se pudieron preparar los modelos", error)
-        setup_worker.finished_ok.connect(setup_finished)
-        setup_worker.failed.connect(setup_failed)
 
+        def start_setup_worker():
+            nonlocal setup_worker
+            setup_worker = ModelSetupWorker()
+            window._setup_worker = setup_worker
+            setup_worker.status_changed.connect(
+                lambda value: (setup_stage.setText(value), status.setText("●  " + value))
+            )
+            setup_worker.finished_ok.connect(setup_finished)
+            setup_worker.failed.connect(setup_failed)
+            setup_worker.start()
+
+        def setup_action():
+            if not setup_failed_state["value"]:
+                setup_dialog.accept()
+                return
+            setup_failed_state["value"] = False
+            setup_button.setVisible(False)
+            setup_progress.setVisible(True)
+            setup_progress.setRange(0, 0)
+            setup_note.setText("Volviendo a comprobar y reparar los modelos locales…")
+            setup_stage.setText("Reintentando la preparación…")
+            status.setText("●  Reintentando preparación de modelos…")
+            start_setup_worker()
+
+        setup_button.clicked.connect(setup_action)
         def restore_window_topmost(_result):
             # Setup temporarily releases the main window's topmost flag. Restore
             # the current preference only after the progress dialog has closed.
@@ -736,6 +764,6 @@ def run_gui(application) -> int:
             window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
             window.show()
         setup_dialog.show()
-        setup_worker.start()
+        start_setup_worker()
 
     return app.exec()
