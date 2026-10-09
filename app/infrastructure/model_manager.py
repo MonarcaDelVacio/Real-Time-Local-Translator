@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -16,6 +17,8 @@ SHERPA_URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
     f"asr-models/{SHERPA_ARCHIVE}"
 )
+# SHA-256 published by the GitHub Releases API for this exact model archive.
+SHERPA_SHA256 = "c6bf5e0df765f9d5b43bc9e0536d4b4b3e7d40bdf5ecf13e45f134c51c05ae3a"
 SHERPA_REQUIRED = ("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
 WHISPER_REQUIRED = (
     "config.json",
@@ -148,7 +151,12 @@ def _status_tqdm_class(status):
     return StatusTqdm
 
 
-def _download_archive(url: str, destination: Path, status) -> None:
+def _download_archive(
+    url: str,
+    destination: Path,
+    status,
+    expected_sha256: str | None = None,
+) -> None:
     import time
 
     temporary = destination.with_suffix(destination.suffix + ".part")
@@ -157,6 +165,7 @@ def _download_archive(url: str, destination: Path, status) -> None:
         temporary.unlink(missing_ok=True)
         try:
             status(f"Descargando modelo ASR streaming desde GitHub (intento {attempt}/3)…")
+            digest = hashlib.sha256()
             with urllib.request.urlopen(url, timeout=60) as response, temporary.open("wb") as out:
                 total = int(response.headers.get("Content-Length", "0") or "0")
                 downloaded = 0
@@ -165,6 +174,7 @@ def _download_archive(url: str, destination: Path, status) -> None:
                     if not block:
                         break
                     out.write(block)
+                    digest.update(block)
                     downloaded += len(block)
                     if total > 0:
                         status(f"Descargando modelo Sherpa-ONNX… {downloaded * 100 // total}%")
@@ -174,6 +184,11 @@ def _download_archive(url: str, destination: Path, status) -> None:
                 )
             if not temporary.is_file() or temporary.stat().st_size < 50_000_000:
                 raise RuntimeError("La descarga del modelo Sherpa-ONNX está incompleta o es demasiado pequeña.")
+            actual_sha256 = digest.hexdigest()
+            if expected_sha256 and actual_sha256.lower() != expected_sha256.lower():
+                raise RuntimeError(
+                    "El SHA-256 del modelo Sherpa-ONNX no coincide con el publicado por GitHub Releases."
+                )
             temporary.replace(destination)
             return
         except Exception as exc:
@@ -190,7 +205,7 @@ def _download_sherpa(destination: Path, status) -> None:
     archive_path = root / SHERPA_ARCHIVE
     staging = root / f".{MODEL}.extracting"
     try:
-        _download_archive(SHERPA_URL, archive_path, status)
+        _download_archive(SHERPA_URL, archive_path, status, expected_sha256=SHERPA_SHA256)
         status("Verificando y extrayendo el modelo ASR streaming…")
         if staging.exists():
             shutil.rmtree(staging)
