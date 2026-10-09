@@ -182,6 +182,43 @@ def _argos_translations_ready(root: Path) -> bool:
     )
 
 
+def _argos_ready_pairs(root: Path) -> set[tuple[str, str]]:
+    """Return the required Argos directions that can actually be loaded."""
+    os.environ["ARGOS_PACKAGES_DIR"] = str(root / "argos")
+    from argostranslate import translate
+
+    ready = set()
+    for source, target in ARGOS_REQUIRED:
+        try:
+            if translate.get_translation_from_codes(source, target) is not None:
+                ready.add((source, target))
+        except Exception:
+            # One corrupt package must not hide the status of the other direction.
+            continue
+    return ready
+
+
+def _remove_argos_installation(root: Path, pair: tuple[str, str], installed_packages) -> bool:
+    """Remove only the broken package for this app, never a path outside its Argos folder."""
+    package_root = (root / "argos").resolve()
+    for item in installed_packages:
+        if (getattr(item, "from_code", None), getattr(item, "to_code", None)) != pair:
+            continue
+        raw_path = getattr(item, "package_path", None)
+        if not raw_path:
+            continue
+        path = Path(raw_path).resolve()
+        if path == package_root or package_root not in path.parents:
+            continue
+        if path.is_dir():
+            shutil.rmtree(path)
+            return True
+        if path.is_file():
+            path.unlink()
+            return True
+    return False
+
+
 def models_ready() -> bool:
     _ensure_gui_stdio()
     root = models_root()
@@ -235,28 +272,43 @@ def ensure_models(status=lambda _: None) -> None:
     from argostranslate import package
 
     status("Verificando paquetes de traducción Argos…")
-    installed = _argos_installed_pairs(root)
-    if not set(ARGOS_REQUIRED).issubset(installed):
+    try:
+        installed = _argos_installed_pairs(root)
+        ready = _argos_ready_pairs(root)
+    except Exception as exc:
+        raise RuntimeError(f"No se pudo inspeccionar la instalación local de Argos: {exc}") from exc
+
+    # A package can be listed as installed while its model files are unusable.
+    # Remove only that app-managed package and reinstall the missing direction.
+    broken = [pair for pair in ARGOS_REQUIRED if pair in installed and pair not in ready]
+    if broken:
+        installed_packages = package.get_installed_packages()
+        for pair in broken:
+            if not _remove_argos_installation(root, pair, installed_packages):
+                source, target = pair
+                raise RuntimeError(
+                    f"Argos {source}->{target} figura instalado pero no puede cargarse, "
+                    "y su archivo no está dentro de la carpeta de modelos de esta aplicación. "
+                    "El paquete debe repararse manualmente."
+                )
+        installed = _argos_installed_pairs(root)
+        ready = _argos_ready_pairs(root)
+
+    missing_pairs = [pair for pair in ARGOS_REQUIRED if pair not in ready]
+    if missing_pairs:
         package.update_package_index()
         available = package.get_available_packages()
-        for src, dst in ARGOS_REQUIRED:
-            if (src, dst) in installed:
-                continue
+        for src, dst in missing_pairs:
             match = next((item for item in available if item.from_code == src and item.to_code == dst), None)
             if match is None:
                 raise RuntimeError(f"El paquete Argos {src}->{dst} no está disponible en el índice.")
-            status(f"Descargando traducción Argos {src} → {dst}…")
+            status(f"Descargando o reparando traducción Argos {src} → {dst}…")
             package.install_from_path(match.download())
 
-    installed = _argos_installed_pairs(root)
-    missing_pairs = [f"{src}->{dst}" for src, dst in ARGOS_REQUIRED if (src, dst) not in installed]
+    ready = _argos_ready_pairs(root)
+    missing_pairs = [f"{src}->{dst}" for src, dst in ARGOS_REQUIRED if (src, dst) not in ready]
     if missing_pairs:
-        raise RuntimeError("Paquetes Argos faltantes o incompletos: " + ", ".join(missing_pairs))
-    try:
-        if not _argos_translations_ready(root):
-            raise RuntimeError("Argos no pudo cargar todos los motores de traducción instalados.")
-    except Exception as exc:
-        raise RuntimeError(f"Los paquetes Argos están instalados, pero no son utilizables: {exc}") from exc
+        raise RuntimeError("Paquetes Argos faltantes o inutilizables: " + ", ".join(missing_pairs))
 
     (root / ".ready").write_text("runtime models ready\n", encoding="utf-8")
     status("Todos los modelos y paquetes locales están listos.")

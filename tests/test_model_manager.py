@@ -1,9 +1,10 @@
 import io
 import tarfile
+from types import SimpleNamespace
 
 import pytest
 
-from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _safe_extract, _whisper_config_valid
+from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _remove_argos_installation, _safe_extract, _whisper_config_valid
 
 
 def test_complete_rejects_empty_required_files(tmp_path):
@@ -65,3 +66,36 @@ def test_whisper_config_validator_rejects_corrupt_or_non_object_json(tmp_path):
     assert not _whisper_config_valid(model)
     config.write_text('{"model_type": "whisper"}', encoding="utf-8")
     assert _whisper_config_valid(model)
+
+
+def test_remove_argos_installation_only_removes_package_inside_app_model_root(tmp_path):
+    root = tmp_path / "models"
+    package_dir = root / "argos" / "translate-en_es"
+    package_dir.mkdir(parents=True)
+    (package_dir / "package.toml").write_text("broken", encoding="utf-8")
+    installed = [
+        SimpleNamespace(
+            from_code="en",
+            to_code="es",
+            package_path=str(package_dir),
+        )
+    ]
+
+    assert _remove_argos_installation(root, ("en", "es"), installed)
+    assert not package_dir.exists()
+
+
+def test_remove_argos_installation_refuses_external_package_path(tmp_path):
+    root = tmp_path / "models"
+    external = tmp_path / "external-package"
+    external.mkdir()
+    installed = [
+        SimpleNamespace(
+            from_code="en",
+            to_code="es",
+            package_path=str(external),
+        )
+    ]
+
+    assert not _remove_argos_installation(root, ("en", "es"), installed)
+    assert external.exists()
