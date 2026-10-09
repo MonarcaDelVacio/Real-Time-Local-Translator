@@ -42,6 +42,7 @@ class TranslationPipeline:
         self.refiner = refiner
         self._speech: list[AudioChunk] = []
         self._silence = 0
+        self._stream_audio_truncated = False
 
     def _buffer_duration(self) -> float:
         if not self._speech:
@@ -56,6 +57,16 @@ class TranslationPipeline:
         chunks, self._speech = self._speech, []
         self._silence = 0
         return chunks
+
+    def _append_stream_audio(self, chunk: AudioChunk) -> None:
+        """Bound retained audio so a missing endpoint cannot grow memory forever."""
+        self._speech.append(chunk)
+        while self._speech and (
+            len(self._speech) > self.max_buffer_chunks
+            or self._buffer_duration() > self.max_utterance_seconds
+        ):
+            self._speech.pop(0)
+            self._stream_audio_truncated = True
 
     def _collect_utterance(self, chunk: AudioChunk) -> list[AudioChunk] | None:
         if self.vad.is_speech(chunk):
@@ -168,14 +179,17 @@ class TranslationPipeline:
                 segments = list(engine.accept_audio(chunk))
                 # Keep exact audio for the current utterance so a stronger
                 # offline model can correct the completed streaming transcript.
-                self._speech.append(chunk)
+                self._append_stream_audio(chunk)
 
                 for segment in segments:
                     if segment.is_final:
                         audio = list(self._speech)
+                        truncated = self._stream_audio_truncated
                         self._speech.clear()
+                        self._stream_audio_truncated = False
                         final_segments = [segment]
-                        if self.refiner is not None:
+                        # Never replace a complete streaming result with a partial audio window.
+                        if self.refiner is not None and not truncated:
                             try:
                                 refined = list(self.refiner.refine(audio, source_language))
                                 if refined:
@@ -199,7 +213,7 @@ class TranslationPipeline:
             # finish_stream() still flushes any text already decoded by streaming ASR.
             stopping = stop_requested()
             finals = list(engine.finish_stream())
-            if self._speech and self.refiner is not None and not stopping:
+            if self._speech and self.refiner is not None and not stopping and not self._stream_audio_truncated:
                 try:
                     refined = list(self.refiner.refine(self._speech, source_language))
                     if refined:
@@ -208,6 +222,7 @@ class TranslationPipeline:
                     if on_error is not None:
                         on_error(exc)
             self._speech.clear()
+            self._stream_audio_truncated = False
             self._translate_segments(finals, on_translation, on_error)
         except Exception as exc:
             if on_error is not None:
@@ -221,24 +236,21 @@ class TranslationPipeline:
         stop_requested: Callable[[], bool],
         on_error: Callable[[Exception], None] | None = None,
     ) -> None:
-        self.source.start()
         try:
+            # Some audio backends may partially initialize a device before raising.
+            self.source.start()
             if isinstance(self.asr, StreamingASREngine):
                 self._run_streaming(on_translation, stop_requested, on_error)
                 return
 
             while not stop_requested():
-                try:
-                    chunk = self.source.read()
-                    ready = self._collect_utterance(chunk)
-                    if ready is not None:
-                        for result in self._translate_chunks(ready, on_error):
-                            on_translation(result)
-                except Exception as exc:
-                    if on_error is not None:
-                        on_error(exc)
-                    else:
-                        raise
+                # Device/read failures are fatal for this session. Catching them
+                # and immediately looping can create a tight infinite error loop.
+                chunk = self.source.read()
+                ready = self._collect_utterance(chunk)
+                if ready is not None:
+                    for result in self._translate_chunks(ready, on_error):
+                        on_translation(result)
 
             for result in self._translate_chunks(self._take_speech(), on_error):
                 on_translation(result)
@@ -246,3 +258,4 @@ class TranslationPipeline:
             self.source.stop()
             self._speech.clear()
             self._silence = 0
+            self._stream_audio_truncated = False
