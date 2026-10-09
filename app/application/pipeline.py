@@ -202,8 +202,9 @@ class TranslationPipeline:
                     try:
                         audio_queue.put(chunk, timeout=0.02)
                     except queue.Full:
-                        # Prefer recent audio over stale audio. Any dropped chunk
-                        # invalidates the current decoder context and preview.
+                        # Publish the discontinuity before replacing a queued chunk.
+                        # The consumer checks this flag before decoding its next item.
+                        audio_discontinuity.set()
                         try:
                             audio_queue.get_nowait()
                         except queue.Empty:
@@ -212,7 +213,6 @@ class TranslationPipeline:
                             audio_queue.put_nowait(chunk)
                         except queue.Full:
                             pass
-                        audio_discontinuity.set()
             except Exception as exc:
                 capture_errors.append(exc)
             finally:
