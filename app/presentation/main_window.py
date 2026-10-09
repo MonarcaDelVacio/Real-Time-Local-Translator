@@ -527,7 +527,7 @@ def run_gui(application) -> int:
             status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
     def append_translation(lang, translated, source, is_final):
-        nonlocal transcript_path, provisional_start, provisional_end
+        nonlocal provisional_start, provisional_end
         from html import escape
 
         source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
@@ -552,6 +552,7 @@ def run_gui(application) -> int:
             if provisional_start is None or provisional_end is None:
                 cursor.movePosition(QTextCursor.MoveOperation.End)
                 provisional_start = QTextCursor(cursor)
+                provisional_start.setKeepPositionOnInsert(True)
             else:
                 cursor.setPosition(provisional_start.position())
                 cursor.setPosition(provisional_end.position(), QTextCursor.MoveMode.KeepAnchor)
