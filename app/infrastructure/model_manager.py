@@ -193,7 +193,6 @@ def ensure_models(status=lambda _: None) -> None:
         raise RuntimeError("El modelo Whisper está incompleto; faltan: " + ", ".join(missing))
     try:
         json.loads((whisper / "config.json").read_text(encoding="utf-8"))
-        json.loads((whisper / "preprocessor_config.json").read_text(encoding="utf-8"))
     except Exception as exc:
         raise RuntimeError(f"La configuración local de Whisper está dañada: {exc}") from exc
     status("Modelo Whisper verificado.")
