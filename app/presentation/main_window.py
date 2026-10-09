@@ -213,23 +213,26 @@ def run_gui(application) -> int:
         dark = system_palette_dark if theme_name == "Sistema" else theme_name == "Oscuro"
         current_theme["dark"] = dark
         app.setStyleSheet(stylesheet_for(dark))
-        if "output" in globals_for_theme:
-            globals_for_theme["output"].setStyleSheet(
-                f"background-color: {'#0b1220' if dark else '#ffffff'}; "
-                f"color: {'#e5edf7' if dark else '#0f172a'}; "
-                f"font-size: {globals_for_theme['font_size'].value()}px; "
-                f"border: 1px solid {'#26344a' if dark else '#cbd5e1'}; "
-                "border-radius: 10px; padding: 12px; selection-background-color: #2563eb;"
-            )
-        if "live_preview" in globals_for_theme:
-            globals_for_theme["live_preview"].setStyleSheet(
-                "QLabel { "
-                f"background: {'#17243a' if dark else '#dbeafe'}; "
-                f"color: {'#bfdbfe' if dark else '#1e40af'}; "
-                f"border: 1px solid {'#2b4264' if dark else '#93c5fd'}; "
-                "border-radius: 8px; padding: 10px 12px; "
-                f"font-size: {globals_for_theme['font_size'].value()}px; font-weight: 600; }}"
-            )
+        for key in ("output", "original_output"):
+            if key in globals_for_theme and "font_size" in globals_for_theme:
+                globals_for_theme[key].setStyleSheet(
+                    f"background-color: {'#0b1220' if dark else '#ffffff'}; "
+                    f"color: {'#e5edf7' if dark else '#0f172a'}; "
+                    f"font-size: {globals_for_theme['font_size'].value()}px; "
+                    f"border: 1px solid {'#26344a' if dark else '#cbd5e1'}; "
+                    "border-radius: 10px; padding: 12px; selection-background-color: #2563eb;"
+                )
+        for key in ("live_translation", "live_original"):
+            if key in globals_for_theme:
+                globals_for_theme[key].setStyleSheet(
+                    "QLabel { "
+                    f"background: {'#17243a' if dark else '#dbeafe'}; "
+                    f"color: {'#bfdbfe' if dark else '#1e40af'}; "
+                    f"border: 1px solid {'#2b4264' if dark else '#93c5fd'}; "
+                    "border-radius: 8px; padding: 10px 12px; "
+                    f"font-size: {globals_for_theme['font_size'].value() if 'font_size' in globals_for_theme else 14}px; "
+                    "font-weight: 600; }"
+                )
 
     globals_for_theme = {}
     apply_theme(str(settings.value("theme", "Oscuro")))
@@ -311,33 +314,62 @@ def run_gui(application) -> int:
     initialization.setVisible(False)
     initialization.setMinimumHeight(22)
 
-    live_preview = QLabel("En vivo: esperando audio…")
-    live_preview.setWordWrap(True)
-    live_preview.setMinimumHeight(52)
-    live_preview.setVisible(True)
-    live_preview.setStyleSheet(
-        "QLabel { background: #17243a; color: #bfdbfe; border: 1px solid #2b4264; "
-        "border-radius: 8px; padding: 10px 12px; font-weight: 600; }"
-    )
+    live_row = QHBoxLayout()
+    live_original = QLabel("Original en vivo: esperando audio…")
+    live_original.setWordWrap(True)
+    live_original.setMinimumHeight(52)
+    live_translation = QLabel("Traducción en vivo: esperando audio…")
+    live_translation.setWordWrap(True)
+    live_translation.setMinimumHeight(52)
+    live_row.addWidget(live_original, 1)
+    live_row.addWidget(live_translation, 1)
 
+    original_panel = QWidget()
+    original_column = QVBoxLayout(original_panel)
+    original_column.setContentsMargins(0, 0, 0, 0)
+    original_column.setSpacing(6)
+    original_heading = QLabel("TEXTO ORIGINAL")
+    original_heading.setStyleSheet("font-weight: 700;")
+    original_output = QTextEdit()
+    original_output.setReadOnly(True)
+    original_output.setAcceptRichText(True)
+    original_output.setPlaceholderText("La transcripción reconocida aparecerá aquí, sin mezclarse con la traducción.")
+    original_column.addWidget(original_heading)
+    original_column.addWidget(original_output, 1)
+
+    translated_panel = QWidget()
+    translated_column = QVBoxLayout(translated_panel)
+    translated_column.setContentsMargins(0, 0, 0, 0)
+    translated_column.setSpacing(6)
+    translated_heading = QLabel("TEXTO TRADUCIDO")
+    translated_heading.setStyleSheet("font-weight: 700;")
     output = QTextEdit()
     output.setReadOnly(True)
     output.setAcceptRichText(True)
-    # Keep finalized session history in the visible document; it is also saved
-    # to a separate UTF-8 file so the user can review it after the session.
     output.setPlaceholderText(
         "Cuando estés listo, pulsa «Iniciar» y reproduce una voz por los altavoces o auriculares de Windows.\n\n"
-        "Las traducciones finales aparecerán aquí automáticamente."
+        "Las traducciones confirmadas aparecerán aquí y se acumularán."
     )
+    translated_column.addWidget(translated_heading)
+    translated_column.addWidget(output, 1)
+
+    history_row = QHBoxLayout()
+    history_row.setSpacing(12)
+    history_row.addWidget(original_panel, 1)
+    history_row.addWidget(translated_panel, 1)
+    original_panel.setVisible(show_original.isChecked())
+
     globals_for_theme["output"] = output
-    globals_for_theme["live_preview"] = live_preview
+    globals_for_theme["original_output"] = original_output
+    globals_for_theme["live_original"] = live_original
+    globals_for_theme["live_translation"] = live_translation
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
     layout.addWidget(initialization)
     layout.addWidget(toolbar)
-    layout.addWidget(live_preview)
-    layout.addWidget(output, 1)
+    layout.addLayout(live_row)
+    layout.addLayout(history_row, 1)
     window.setCentralWidget(central)
 
     # Keep advanced controls together in a dedicated settings dialog.
@@ -500,7 +532,8 @@ def run_gui(application) -> int:
         save_preferences()
         transcript_path = None
         history_path = None
-        live_preview.setText("En vivo: esperando audio…")
+        live_original.setText("Original en vivo: esperando audio…")
+        live_translation.setText("Traducción en vivo: esperando audio…")
         worker = Worker(application, target.currentData())
         initialization.setVisible(True)
         initialization.setFormat("Inicializando motores locales…")
@@ -529,8 +562,8 @@ def run_gui(application) -> int:
         always_on_top_box.setEnabled(False)
         theme_combo.setEnabled(False)
 
-    def scroll_output_to_bottom():
-        scrollbar = output.verticalScrollBar()
+    def scroll_output_to_bottom(widget):
+        scrollbar = widget.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
     def append_original_transcript(source):
@@ -554,44 +587,45 @@ def run_gui(application) -> int:
         source_text = " ".join((source or "").split())
         translated_text = " ".join((translated or "").split())
         if not is_final:
-            # Mutable recognition hypotheses live only in this separate panel.
-            # They never enter or replace any part of the finalized history.
-            preview_lines = ["EN VIVO · provisional"]
+            # Mutable hypotheses are shown in separate live panels; they never
+            # enter the permanent transcript or overwrite finalized entries.
             if show_original.isChecked() and source_text:
-                preview_lines.append(f"Original: {source_text}")
+                live_original.setText(f"Original en vivo: {source_text}")
             if translated_text:
-                preview_lines.append(f"Traducción: {translated_text}")
-            live_preview.setText("\n".join(preview_lines))
-            status.setText("●  Reconociendo y traduciendo; el historial confirmado se conserva abajo…")
+                live_translation.setText(f"Traducción en vivo: {translated_text}")
+            status.setText("●  Reconociendo y traduciendo; el historial confirmado se conserva…")
             return
 
-        # Every final result is append-only in the UI and on disk. Do not remove
-        # prior entries when the ASR revises its live hypothesis.
         source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
         translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
-        if show_original.isChecked() and source_text:
-            entry = (
-                f'<div style="margin-bottom:18px; padding-bottom:12px; '
-                f'border-bottom:1px solid {"#26344a" if current_theme["dark"] else "#d5deea"};">'
-                f'<div style="color:{source_color};">{escape(source_text)}</div>'
-                f'<div style="margin-top:5px; font-weight:700; color:{translated_color};">'
-                f'{escape(translated_text)}</div></div>'
-            )
-        else:
-            entry = (
-                f'<div style="margin-bottom:18px; padding-bottom:12px; '
-                f'border-bottom:1px solid {"#26344a" if current_theme["dark"] else "#d5deea"}; '
-                f'font-weight:700; color:{translated_color};">{escape(translated_text)}</div>'
+        border_color = "#26344a" if current_theme["dark"] else "#d5deea"
+
+        def append_entry(widget, html):
+            scrollbar = widget.verticalScrollBar()
+            follow_new_text = scrollbar.value() >= scrollbar.maximum() - 4
+            cursor = widget.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            cursor.insertHtml(html)
+            cursor.insertBlock()
+            widget.setTextCursor(cursor)
+            if follow_new_text:
+                scroll_output_to_bottom(widget)
+
+        if source_text:
+            append_entry(
+                original_output,
+                f'<div style="margin-bottom:12px; padding-bottom:10px; '
+                f'border-bottom:1px solid {border_color}; color:{source_color};">'
+                f'{escape(source_text)}</div>',
             )
 
-        scrollbar = output.verticalScrollBar()
-        follow_new_text = scrollbar.value() >= scrollbar.maximum() - 4
-        cursor = output.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertHtml(entry)
-        output.setTextCursor(cursor)
-        if follow_new_text:
-            scroll_output_to_bottom()
+        if translated_text:
+            append_entry(
+                output,
+                f'<div style="margin-bottom:12px; padding-bottom:10px; '
+                f'border-bottom:1px solid {border_color}; font-weight:700; color:{translated_color};">'
+                f'{escape(translated_text)}</div>',
+            )
 
         try:
             folder = transcripts_directory()
@@ -603,7 +637,8 @@ def run_gui(application) -> int:
         except OSError as exc:
             status.setText(f"●  No se pudo guardar el historial de traducción: {exc}")
 
-        live_preview.setText("En vivo: esperando el siguiente fragmento…")
+        live_original.setText("Original en vivo: esperando el siguiente fragmento…")
+        live_translation.setText("Traducción en vivo: esperando el siguiente fragmento…")
         status.setText("●  Fragmento confirmado; historial guardado")
 
     def stop_session():
@@ -619,6 +654,7 @@ def run_gui(application) -> int:
     def clear_output():
         # This clears only the on-screen view. Saved transcript files remain intact.
         output.clear()
+        original_output.clear()
 
     def change_font_size(value):
         settings.setValue("font_size", value)
@@ -649,7 +685,7 @@ def run_gui(application) -> int:
 
     always_on_top_box.toggled.connect(set_always_on_top)
     font_size.valueChanged.connect(change_font_size)
-    show_original.toggled.connect(lambda _: save_preferences())
+    show_original.toggled.connect(lambda _: (original_panel.setVisible(show_original.isChecked()), save_preferences()))
     target.currentIndexChanged.connect(lambda _: save_preferences())
     theme_combo.currentTextChanged.connect(apply_selected_theme)
     open_transcripts.clicked.connect(open_transcripts_folder)
