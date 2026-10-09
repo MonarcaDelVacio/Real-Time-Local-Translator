@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.infrastructure.model_manager import WHISPER_REQUIRED, _assets_complete, _complete, _remove_argos_installation, _safe_extract, _whisper_config_valid
+from app.infrastructure.model_manager import WHISPER_REQUIRED, _assets_complete, _complete, _remove_argos_installation, _safe_extract, _status_tqdm_class, _whisper_config_valid
 
 
 def test_complete_rejects_empty_required_files(tmp_path):
@@ -112,3 +112,19 @@ def test_assets_complete_rejects_nonempty_but_truncated_model_file(tmp_path):
 
     weights.write_bytes(b"x" * 100)
     assert _assets_complete(model, {"model.bin": 100})
+
+
+def test_huggingface_progress_is_forwarded_to_setup_status():
+    messages = []
+    progress_type = _status_tqdm_class(messages.append)
+    progress = progress_type(total=100, disable=True)
+    try:
+        progress.update(25)
+        progress.update(25)
+        progress.update(50)
+    finally:
+        progress.close()
+
+    assert any("25%" in message for message in messages)
+    assert any("50%" in message for message in messages)
+    assert messages[-1].startswith("Descargando Whisper… 100%")
