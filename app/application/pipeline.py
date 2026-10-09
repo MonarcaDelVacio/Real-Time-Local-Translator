@@ -191,9 +191,14 @@ class TranslationPipeline:
         next_final_sequence = 0
         next_final_to_emit = 0
         completed_finals: dict[int, tuple[list[TranscriptSegment], Exception | None]] = {}
-        deferred_preview: TranscriptSegment | None = None
+        fallback_finals: dict[int, TranscriptSegment] = {}
         refiner_thread: threading.Thread | None = None
         refiner_shutdown = False
+        # Provisional translation must not run on the audio/ASR consumer thread.
+        # A size-one queue keeps only the newest hypothesis when translation lags.
+        preview_jobs: queue.Queue = queue.Queue(maxsize=1)
+        preview_stop = threading.Event()
+        preview_thread: threading.Thread | None = None
 
         def capture_audio() -> None:
             try:
@@ -239,6 +244,42 @@ class TranslationPipeline:
                     error = exc
                 refinement_results.put((sequence, refined, error))
 
+        def preview_worker() -> None:
+            while not preview_stop.is_set():
+                try:
+                    segment = preview_jobs.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                if segment is sentinel:
+                    return
+                try:
+                    self._translate_segments([segment], on_translation, on_error)
+                except Exception as exc:
+                    if on_error is not None:
+                        on_error(exc)
+
+        def queue_latest_preview(segment: TranscriptSegment) -> None:
+            try:
+                preview_jobs.put_nowait(segment)
+            except queue.Full:
+                try:
+                    preview_jobs.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    preview_jobs.put_nowait(segment)
+                except queue.Full:
+                    # The worker is taking a job concurrently; the next partial
+                    # will refresh the preview without delaying audio processing.
+                    pass
+
+        preview_thread = threading.Thread(
+            target=preview_worker,
+            name="RTL-Live-Preview-Translation",
+            daemon=True,
+        )
+        preview_thread.start()
+
         if self.refiner is not None:
             refiner_thread = threading.Thread(
                 target=refine_worker,
@@ -248,9 +289,10 @@ class TranslationPipeline:
             refiner_thread.start()
 
         def emit_ready_finals() -> None:
-            nonlocal next_final_to_emit, deferred_preview
+            nonlocal next_final_to_emit
             while next_final_to_emit in completed_finals:
                 segments, refinement_error = completed_finals.pop(next_final_to_emit)
+                fallback_finals.pop(next_final_to_emit, None)
                 if refinement_error is not None and on_error is not None:
                     on_error(refinement_error)
                 self._translate_segments(
@@ -258,12 +300,6 @@ class TranslationPipeline:
                     finals_only=True, on_transcript=on_transcript,
                 )
                 next_final_to_emit += 1
-            # The UI currently owns one provisional entry. Defer later previews
-            # until all outstanding refinements are resolved so a late final
-            # cannot accidentally replace a newer utterance's preview.
-            if pending_refinements == 0 and deferred_preview is not None:
-                preview, deferred_preview = deferred_preview, None
-                self._translate_segments([preview], on_translation, on_error)
 
         def drain_refinement_results() -> None:
             nonlocal pending_refinements
@@ -280,6 +316,7 @@ class TranslationPipeline:
             nonlocal next_final_sequence, pending_refinements
             sequence = next_final_sequence
             next_final_sequence += 1
+            fallback_finals[sequence] = segment
             should_refine = (
                 self.refiner is not None
                 and audio
@@ -347,10 +384,7 @@ class TranslationPipeline:
                         if segment.text != last_preview_text and now - last_preview_at >= 0.35:
                             last_preview_at = now
                             last_preview_text = segment.text
-                            if pending_refinements:
-                                deferred_preview = segment
-                            else:
-                                self._translate_segments([segment], on_translation, on_error)
+                            queue_latest_preview(segment)
 
             stopping = stop_requested() or bool(capture_errors)
             finals = list(engine.finish_stream())
@@ -382,12 +416,21 @@ class TranslationPipeline:
             self._stream_audio_truncated = False
 
             if refiner_thread is not None:
-                # Queue sentinel after all scheduled jobs, then drain completed
-                # results in sequence order before returning from the session.
-                refinement_jobs.put(sentinel)
-                refiner_thread.join()
-                refiner_shutdown = True
+                # Do not let a slow or stuck refinement hold the live session
+                # open forever. Give completed jobs a short grace period, then
+                # emit the already-decoded streaming finals for any unfinished
+                # jobs so every sequence can be flushed in order.
+                try:
+                    refinement_jobs.put(sentinel, timeout=0.5)
+                except queue.Full:
+                    pass
+                refiner_thread.join(timeout=1.5)
+                refiner_shutdown = not refiner_thread.is_alive()
                 drain_refinement_results()
+                if not refiner_shutdown:
+                    for sequence, fallback in fallback_finals.items():
+                        if sequence not in completed_finals and sequence >= next_final_to_emit:
+                            completed_finals[sequence] = ([fallback], None)
                 emit_ready_finals()
 
             if capture_errors and on_error is not None:
@@ -405,7 +448,19 @@ class TranslationPipeline:
                     refinement_jobs.put(sentinel, timeout=0.5)
                 except queue.Full:
                     pass
-                refiner_thread.join(timeout=2.0)
+                refiner_thread.join(timeout=1.0)
+            preview_stop.set()
+            try:
+                while True:
+                    preview_jobs.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                preview_jobs.put_nowait(sentinel)
+            except queue.Full:
+                pass
+            if preview_thread is not None:
+                preview_thread.join(timeout=0.5)
 
     def run(
         self,
