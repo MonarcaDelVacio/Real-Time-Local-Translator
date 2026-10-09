@@ -8,7 +8,7 @@ def run_gui(application) -> int:
     from pathlib import Path
     from datetime import datetime
     from PySide6.QtCore import QThread, Signal, QSettings, Qt, QUrl
-    from PySide6.QtGui import QFont, QPalette, QDesktopServices
+    from PySide6.QtGui import QPalette, QDesktopServices
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
