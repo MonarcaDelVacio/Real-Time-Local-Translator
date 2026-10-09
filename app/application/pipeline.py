@@ -264,6 +264,11 @@ class TranslationPipeline:
                                 if on_error is not None:
                                     on_error(exc)
                         self._translate_segments(final_segments, on_translation, on_error)
+                        # A new utterance may legitimately begin with the same
+                        # words as the previous one. Reset preview deduplication
+                        # after each finalized segment so that phrase can appear live.
+                        last_preview_at = 0.0
+                        last_preview_text = ""
                     elif segment.text.strip():
                         # Argos translation is synchronous. Translating every ASR
                         # revision can consume more time than the audio arriving and
