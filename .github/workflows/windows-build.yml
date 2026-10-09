@@ -59,6 +59,11 @@ jobs:
           if (-not $setup) {
             throw "Inno Setup completed without producing an installer in $installerOutput"
           }
+          foreach ($file in $setup) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            Set-Content -LiteralPath ($file.FullName + ".sha256") -Value "$hash  $($file.Name)" -Encoding ascii
+            Write-Host "SHA-256 $($file.Name): $hash"
+          }
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4

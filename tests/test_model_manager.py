@@ -3,7 +3,7 @@ import tarfile
 
 import pytest
 
-from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _safe_extract
+from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _safe_extract, _whisper_config_valid
 
 
 def test_complete_rejects_empty_required_files(tmp_path):
@@ -53,3 +53,15 @@ def test_official_faster_whisper_small_files_are_sufficient(tmp_path):
         (model / name).write_bytes(b"valid")
     assert "preprocessor_config.json" not in WHISPER_REQUIRED
     assert _complete(model, WHISPER_REQUIRED)
+
+
+def test_whisper_config_validator_rejects_corrupt_or_non_object_json(tmp_path):
+    model = tmp_path / "small"
+    model.mkdir()
+    config = model / "config.json"
+    config.write_text("{broken", encoding="utf-8")
+    assert not _whisper_config_valid(model)
+    config.write_text("[]", encoding="utf-8")
+    assert not _whisper_config_valid(model)
+    config.write_text('{"model_type": "whisper"}', encoding="utf-8")
+    assert _whisper_config_valid(model)

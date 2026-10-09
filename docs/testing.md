@@ -1,52 +1,41 @@
-# Windows test procedure — Preview 0.3.1
+# Windows validation procedure — version 0.4.2
 
-## Objetivo
+## Purpose
 
-Validar el circuito completo sobre Windows real.
+Validate the actual packaged application on Windows. A successful GitHub Actions run only proves that automated tests and packaging completed; it does not validate the user's audio device or real-time latency.
 
-## 1. Instalar
+## 1. Installation and first start
 
-Usa `RealTimeLocalTranslatorSetup-0.3.1.exe`.
+1. Download the artifact from the successful Windows build in GitHub Actions.
+2. Install the generated setup executable. Verify its SHA-256 using the accompanying .sha256 file when available.
+3. Start the application and allow initial model preparation to finish. This step requires internet access.
+4. Confirm that the Start button becomes enabled and no setup error is shown.
 
-No necesitas instalar Python.
+## 2. English → Spanish
 
-## 2. Prueba Inglés → Español
+1. Set the Windows playback device you want to capture as the default output.
+2. Play clear spoken English through that device.
+3. Select Español as the target language and press Iniciar.
+4. Confirm that provisional text updates while speech is ongoing and that a finalized translation appears after a phrase ends.
+5. Confirm that the original-language transcript is saved when final segments are emitted.
+6. Press Detener and verify that the application exits the capture session without hanging.
 
-1. Conecta tus auriculares o altavoces.
-2. Comprueba que sean el dispositivo de salida predeterminado de Windows.
-3. Reproduce una voz clara en inglés.
-4. Abre el traductor.
-5. Selecciona **Español**.
-6. Pulsa **Iniciar**.
-7. Espera el primer segmento traducido.
-8. Pulsa **Detener**.
+## 3. Spanish → English
 
-## 3. Prueba Español → Inglés
+Repeat with clear Spanish speech and select English as the target language.
 
-Repite el procedimiento reproduciendo una voz en español y seleccionando **English**.
+## 4. Stress and recovery checks
 
-## Resultado esperado
+- Run continuous speech for at least 10 minutes and watch for growing latency, dropped phrases, memory growth, or frozen UI.
+- Test short pauses, long pauses, repeated opening words across consecutive phrases, and rapid speech.
+- Close the app only after model preparation finishes; confirm the progress window can be left in the background.
+- Temporarily remove or corrupt config.json in the user model folder and verify that startup triggers a successful repair instead of repeating the same error.
+- Test on a mono-capable/mono-only playback endpoint and run scripts/diagnose_audio.py.
+- Test startup on a clean Windows account without a developer Python environment.
 
-Windows playback
-→ WASAPI Loopback
-→ VAD
-→ faster-whisper
-→ detección de idioma
-→ Argos Translate
-→ interfaz
+## Known limitations
 
-## Si no captura audio
-
-En la versión de desarrollo puedes ejecutar:
-
-`scripts\\diagnose_audio.py`
-
-mientras se reproduce audio. El diagnóstico debe detectar el dispositivo de reproducción predeterminado y bloques no silenciosos.
-
-## Limitaciones de la Preview
-
-- Solo se distribuyen Inglés ↔ Español en esta primera prueba.
-- La calidad depende del modelo Whisper y de los paquetes Argos.
-- La latencia y el consumo deben medirse en hardware real.
-- El VAD actual es un detector energético básico.
-- La Preview no debe considerarse una versión final hasta completar las pruebas.
+- Only English ↔ Spanish is supported in the current UI.
+- Source language is inferred from the selected target language; this is not universal automatic language detection.
+- Whisper refinement may delay final results and needs sustained-load validation.
+- Audio capture, model initialization time, latency, CPU/memory use, and long-session stability still require hardware testing.

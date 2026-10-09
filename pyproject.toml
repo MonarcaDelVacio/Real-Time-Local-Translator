@@ -14,4 +14,4 @@ testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.setuptools.packages.find]
-include = ["app*", "engines*"]
+include = ["app*", "engines*", "config*"]

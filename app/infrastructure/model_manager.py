@@ -7,7 +7,7 @@ import tarfile
 import urllib.request
 from pathlib import Path, PurePosixPath
 
-from app.infrastructure.paths import models_root
+from app.infrastructure.paths import bundled_models_root, models_root
 
 MODEL = "nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11"
 WHISPER_MODEL = "Systran/faster-whisper-small"
@@ -42,6 +42,40 @@ def _complete(path: Path, names: tuple[str, ...]) -> bool:
         (path / name).is_file() and (path / name).stat().st_size > 0
         for name in names
     )
+
+
+def _whisper_config_valid(path: Path) -> bool:
+    """Return whether the local CTranslate2 config is readable JSON object data."""
+    try:
+        value = json.loads((path / "config.json").read_text(encoding="utf-8"))
+        return isinstance(value, dict) and bool(value)
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+
+
+def _seed_bundled_models(root: Path) -> None:
+    """Copy complete bundled model assets into the writable per-user directory."""
+    source = bundled_models_root()
+    if source is None or source.resolve() == root.resolve():
+        return
+    for relative, required in (
+        (Path("sherpa") / MODEL, SHERPA_REQUIRED),
+        (Path("whisper") / "small", WHISPER_REQUIRED),
+    ):
+        bundled = source / relative
+        destination = root / relative
+        if _complete(destination, required):
+            continue
+        if _complete(bundled, required):
+            if destination.exists():
+                shutil.rmtree(destination, ignore_errors=True)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(bundled, destination)
+    bundled_argos = source / "argos"
+    destination_argos = root / "argos"
+    if bundled_argos.is_dir() and not destination_argos.exists():
+        destination_argos.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(bundled_argos, destination_argos)
 
 
 def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
@@ -154,11 +188,9 @@ def models_ready() -> bool:
     if not _complete(root / "sherpa" / MODEL, SHERPA_REQUIRED):
         return False
     whisper = root / "whisper" / "small"
-    if not _complete(whisper, WHISPER_REQUIRED):
+    if not _complete(whisper, WHISPER_REQUIRED) or not _whisper_config_valid(whisper):
         return False
     try:
-        # Catch partial/corrupt JSON before enabling the Start button.
-        json.loads((whisper / "config.json").read_text(encoding="utf-8"))
         return _argos_translations_ready(root)
     except Exception:
         return False
@@ -169,6 +201,7 @@ def ensure_models(status=lambda _: None) -> None:
     _ensure_gui_stdio()
     root = models_root()
     root.mkdir(parents=True, exist_ok=True)
+    _seed_bundled_models(root)
     sherpa = root / "sherpa" / MODEL
     whisper = root / "whisper" / "small"
 
@@ -178,23 +211,24 @@ def ensure_models(status=lambda _: None) -> None:
         raise RuntimeError("El modelo Sherpa-ONNX sigue incompleto después de la descarga.")
     status("Modelo ASR streaming verificado.")
 
-    if not _complete(whisper, WHISPER_REQUIRED):
+    if not _complete(whisper, WHISPER_REQUIRED) or not _whisper_config_valid(whisper):
         status("Descargando o reparando el modelo Whisper de refinamiento…")
         from huggingface_hub import snapshot_download
 
         whisper.parent.mkdir(parents=True, exist_ok=True)
+        # A malformed config must not be treated as a complete local snapshot.
+        # force_download also repairs required files that exist but were truncated.
         snapshot_download(
             repo_id=WHISPER_MODEL,
             local_dir=str(whisper),
             allow_patterns=list(WHISPER_REQUIRED),
+            force_download=True,
         )
     missing = [name for name in WHISPER_REQUIRED if not (whisper / name).is_file() or (whisper / name).stat().st_size == 0]
     if missing:
         raise RuntimeError("El modelo Whisper está incompleto; faltan: " + ", ".join(missing))
-    try:
-        json.loads((whisper / "config.json").read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise RuntimeError(f"La configuración local de Whisper está dañada: {exc}") from exc
+    if not _whisper_config_valid(whisper):
+        raise RuntimeError("La configuración local de Whisper sigue dañada después de intentar repararla.")
     status("Modelo Whisper verificado.")
 
     os.environ["ARGOS_PACKAGES_DIR"] = str(root / "argos")

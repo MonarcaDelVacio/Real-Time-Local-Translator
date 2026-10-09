@@ -37,13 +37,34 @@ def main() -> int:
     non_silent = 0
     total_frames = 0
 
-    with microphone.recorder(samplerate=sample_rate, channels=[0, 1], blocksize=block_frames) as recorder:
+    recorder_context = None
+    selected_channels = None
+    # Some Windows loopback endpoints expose only one channel. Try stereo first,
+    # then mono, matching the fallback supported by the application.
+    for channels in ([0, 1], [0]):
+        try:
+            recorder_context = microphone.recorder(
+                samplerate=sample_rate, channels=channels, blocksize=block_frames
+            )
+            recorder_context.__enter__()
+            selected_channels = channels
+            break
+        except Exception as exc:
+            print(f"Could not open loopback with channels {channels}: {exc}")
+            recorder_context = None
+    if recorder_context is None:
+        print("ERROR: could not open loopback in stereo or mono.")
+        return 1
+    try:
         while time.perf_counter() - started < 5:
-            data = recorder.record(numframes=block_frames)
+            data = recorder_context.record(numframes=block_frames)
             blocks += 1
             total_frames += len(data)
             if data.size and float(abs(data).max()) > 0.001:
                 non_silent += 1
+    finally:
+        recorder_context.__exit__(None, None, None)
+    print(f"Channels: {len(selected_channels)}")
 
     elapsed = time.perf_counter() - started
     print(f"Blocks: {blocks}")

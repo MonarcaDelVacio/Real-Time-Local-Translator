@@ -37,3 +37,26 @@ def models_root() -> Path:
 
 def whisper_model_path(model_name: str) -> Path:
     return models_root() / "whisper" / model_name
+
+
+def bundled_models_root() -> Path | None:
+    """Return read-only model assets bundled by PyInstaller, if present."""
+    if not getattr(sys, "frozen", False):
+        return None
+    candidates = (
+        Path(getattr(sys, "_MEIPASS", project_root())) / "models",
+        project_root() / "models",
+        project_root() / "_internal" / "models",
+    )
+    seen: set[Path] = set()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if resolved.is_dir():
+            return resolved
+    return None
