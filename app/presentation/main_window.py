@@ -470,21 +470,26 @@ def run_gui(application) -> int:
         # Persist only finalized original-language text, independently of whether
         # the user chooses to display the original text in the UI.
         if source and source.strip():
-            folder = transcripts_directory()
-            folder.mkdir(parents=True, exist_ok=True)
-            if transcript_path is None:
-                transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
-                transcript_path.write_text(
-                    "Transcripción original — Real-Time Local Translator\\n"
-                    f"Sesión iniciada: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
-                    "El contenido de este archivo se guarda localmente en el equipo.\\n\\n",
-                    encoding="utf-8",
-                )
-            with transcript_path.open("a", encoding="utf-8") as transcript_file:
-                transcript_file.write(
-                    f"[{datetime.now().strftime('%H:%M:%S')}] "
-                    f"[{(lang or 'auto').upper()}] {source.strip()}\\n"
-                )
+            try:
+                folder = transcripts_directory()
+                folder.mkdir(parents=True, exist_ok=True)
+                if transcript_path is None:
+                    transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
+                    transcript_path.write_text(
+                        "Transcripción original — Real-Time Local Translator\\n"
+                        f"Sesión iniciada: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
+                        "El contenido de este archivo se guarda localmente en el equipo.\\n\\n",
+                        encoding="utf-8",
+                    )
+                with transcript_path.open("a", encoding="utf-8") as transcript_file:
+                    transcript_file.write(
+                        f"[{datetime.now().strftime('%H:%M:%S')}] "
+                        f"[{(lang or 'auto').upper()}] {source.strip()}\\n"
+                    )
+            except OSError as exc:
+                # A disk/permission problem must not discard the translation or
+                # crash the GUI slot; surface the save failure instead.
+                status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
         source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
         translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
