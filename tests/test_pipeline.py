@@ -127,7 +127,10 @@ def test_streaming_capture_continues_while_whisper_refines():
             pass
 
         def accept_audio(self, chunk):
-            return [TranscriptSegment("hello", 0, 1, "en", is_final=True)]
+            return [
+                TranscriptSegment("hello", 0, 1, "en", is_final=False),
+                TranscriptSegment("hello", 0, 1, "en", is_final=True),
+            ]
 
         def finish_stream(self):
             return []
@@ -158,6 +161,9 @@ def test_streaming_capture_continues_while_whisper_refines():
     p.run(results.append, lambda: False, errors.append)
 
     final_results = [item for item in results if item.source.is_final]
+    provisional_results = [item for item in results if not item.source.is_final]
     assert len(final_results) == 5
+    assert provisional_results
+    assert all(item.translated_text == "hola" for item in provisional_results)
     assert refiner.capture_advanced_during_refinement
     assert errors and "end of test audio" in str(errors[0])
