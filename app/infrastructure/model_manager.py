@@ -22,7 +22,6 @@ WHISPER_REQUIRED = (
     "model.bin",
     "tokenizer.json",
     "vocabulary.txt",
-    "preprocessor_config.json",
 )
 ARGOS_REQUIRED = (("en", "es"), ("es", "en"))
 
@@ -160,7 +159,6 @@ def models_ready() -> bool:
     try:
         # Catch partial/corrupt JSON before enabling the Start button.
         json.loads((whisper / "config.json").read_text(encoding="utf-8"))
-        json.loads((whisper / "preprocessor_config.json").read_text(encoding="utf-8"))
         return _argos_translations_ready(root)
     except Exception:
         return False
