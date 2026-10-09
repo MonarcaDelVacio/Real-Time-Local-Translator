@@ -157,6 +157,7 @@ class TranslationPipeline:
     ) -> None:
         import queue
         import threading
+        import time
 
         engine = self.asr
         if not isinstance(engine, StreamingASREngine):
@@ -167,16 +168,22 @@ class TranslationPipeline:
         if set_source_language is not None:
             set_source_language(source_language)
 
-        # Audio capture runs independently from ASR/Whisper. Refinement can take
-        # several seconds, so it must not stop the device from being read.
-        # Keep only a short audio backlog. A large queue hides overload by
-        # translating increasingly old audio, making latency grow throughout a session.
-        # At 16 kHz / 2048 frames, 32 chunks represent about 4 seconds.
+        # Capture and streaming ASR must never wait for Whisper refinement.
+        # Keep the device queue bounded to avoid latency growing without limit.
         audio_queue: queue.Queue = queue.Queue(maxsize=32)
+        refinement_jobs: queue.Queue = queue.Queue(maxsize=4)
+        refinement_results: queue.Queue = queue.Queue()
         sentinel = object()
         producer_stop = threading.Event()
         audio_discontinuity = threading.Event()
         capture_errors: list[Exception] = []
+        pending_refinements = 0
+        next_final_sequence = 0
+        next_final_to_emit = 0
+        completed_finals: dict[int, tuple[list[TranscriptSegment], Exception | None]] = {}
+        deferred_preview: TranscriptSegment | None = None
+        refiner_thread: threading.Thread | None = None
+        refiner_shutdown = False
 
         def capture_audio() -> None:
             try:
@@ -185,28 +192,100 @@ class TranslationPipeline:
                     try:
                         audio_queue.put(chunk, timeout=0.02)
                     except queue.Full:
-                        # Prefer recent audio over stale audio. Mark the gap so the
-                        # consumer resets the streaming decoder before continuing.
+                        # Prefer recent audio over stale audio. Any dropped chunk
+                        # invalidates the current decoder context and preview.
                         try:
                             audio_queue.get_nowait()
                         except queue.Empty:
                             pass
                         try:
                             audio_queue.put_nowait(chunk)
-                            audio_discontinuity.set()
                         except queue.Full:
-                            # The consumer raced us; the next capture iteration retries.
-                            audio_discontinuity.set()
+                            pass
+                        audio_discontinuity.set()
             except Exception as exc:
                 capture_errors.append(exc)
             finally:
-                while True:
+                while not producer_stop.is_set():
                     try:
                         audio_queue.put(sentinel, timeout=0.1)
                         break
                     except queue.Full:
-                        if producer_stop.is_set():
-                            return
+                        continue
+
+        def refine_worker() -> None:
+            while True:
+                job = refinement_jobs.get()
+                if job is sentinel:
+                    return
+                sequence, audio, language, fallback = job
+                error = None
+                try:
+                    refined = list(self.refiner.refine(audio, language))
+                    if not refined:
+                        refined = [fallback]
+                except Exception as exc:
+                    refined = [fallback]
+                    error = exc
+                refinement_results.put((sequence, refined, error))
+
+        if self.refiner is not None:
+            refiner_thread = threading.Thread(
+                target=refine_worker,
+                name="RTL-Whisper-Refinement",
+                daemon=True,
+            )
+            refiner_thread.start()
+
+        def emit_ready_finals() -> None:
+            nonlocal next_final_to_emit, deferred_preview
+            while next_final_to_emit in completed_finals:
+                segments, refinement_error = completed_finals.pop(next_final_to_emit)
+                if refinement_error is not None and on_error is not None:
+                    on_error(refinement_error)
+                self._translate_segments(segments, on_translation, on_error, finals_only=True)
+                next_final_to_emit += 1
+            # The UI currently owns one provisional entry. Defer later previews
+            # until all outstanding refinements are resolved so a late final
+            # cannot accidentally replace a newer utterance's preview.
+            if pending_refinements == 0 and deferred_preview is not None:
+                preview, deferred_preview = deferred_preview, None
+                self._translate_segments([preview], on_translation, on_error)
+
+        def drain_refinement_results() -> None:
+            nonlocal pending_refinements
+            while True:
+                try:
+                    sequence, segments, error = refinement_results.get_nowait()
+                except queue.Empty:
+                    break
+                pending_refinements = max(0, pending_refinements - 1)
+                completed_finals[sequence] = (segments, error)
+            emit_ready_finals()
+
+        def schedule_final(segment: TranscriptSegment, audio: list[AudioChunk], truncated: bool) -> None:
+            nonlocal next_final_sequence, pending_refinements
+            sequence = next_final_sequence
+            next_final_sequence += 1
+            should_refine = (
+                self.refiner is not None
+                and audio
+                and not truncated
+                and not stop_requested()
+                and not capture_errors
+            )
+            if should_refine:
+                try:
+                    refinement_jobs.put_nowait((sequence, audio, source_language, segment))
+                    pending_refinements += 1
+                except queue.Full:
+                    # Under extreme backlog, keep the already-decoded final rather
+                    # than block the ASR consumer and lose more live audio.
+                    completed_finals[sequence] = ([segment], None)
+            else:
+                completed_finals[sequence] = ([segment], None)
+            drain_refinement_results()
+            emit_ready_finals()
 
         engine.start_stream()
         producer = threading.Thread(
@@ -219,6 +298,7 @@ class TranslationPipeline:
         last_preview_text = ""
         try:
             while True:
+                drain_refinement_results()
                 try:
                     item = audio_queue.get(timeout=0.1)
                 except queue.Empty:
@@ -228,16 +308,11 @@ class TranslationPipeline:
                 if item is sentinel:
                     break
 
-                # A dropped queue chunk creates a gap in the waveform. Reset the
-                # decoder and retained refinement audio rather than treating the
-                # separated samples as continuous speech.
                 if audio_discontinuity.is_set():
                     audio_discontinuity.clear()
                     engine.start_stream()
                     self._speech.clear()
                     self._stream_audio_truncated = False
-                    # A dropped audio interval invalidates the previous partial
-                    # hypothesis as well as the decoder state.
                     last_preview_at = 0.0
                     last_preview_text = ""
 
@@ -251,64 +326,56 @@ class TranslationPipeline:
                         truncated = self._stream_audio_truncated
                         self._speech.clear()
                         self._stream_audio_truncated = False
-                        final_segments = [segment]
-                        # If the user is stopping, preserve the fast shutdown
-                        # path and use the already-decoded streaming transcript.
-                        if (
-                            self.refiner is not None
-                            and not truncated
-                            and not stop_requested()
-                            and not capture_errors
-                        ):
-                            try:
-                                refined = list(self.refiner.refine(audio, source_language))
-                                if refined:
-                                    final_segments = refined
-                            except Exception as exc:
-                                if on_error is not None:
-                                    on_error(exc)
-                        self._translate_segments(final_segments, on_translation, on_error)
-                        # A new utterance may legitimately begin with the same
-                        # words as the previous one. Reset preview deduplication
-                        # after each finalized segment so that phrase can appear live.
+                        schedule_final(segment, audio, truncated)
                         last_preview_at = 0.0
                         last_preview_text = ""
                     elif segment.text.strip():
-                        # Argos translation is synchronous. Translating every ASR
-                        # revision can consume more time than the audio arriving and
-                        # starve the decoder. Refresh the provisional preview at most
-                        # about 3 times per second; final segments are never throttled.
-                        import time
-
                         now = time.monotonic()
-                        if (
-                            segment.text != last_preview_text
-                            and now - last_preview_at >= 0.35
-                        ):
+                        if segment.text != last_preview_text and now - last_preview_at >= 0.35:
                             last_preview_at = now
                             last_preview_text = segment.text
-                            self._translate_segments(
-                                [segment], on_translation, on_error
-                            )
+                            if pending_refinements:
+                                deferred_preview = segment
+                            else:
+                                self._translate_segments([segment], on_translation, on_error)
 
             stopping = stop_requested() or bool(capture_errors)
             finals = list(engine.finish_stream())
-            if (
-                self._speech
-                and self.refiner is not None
-                and not stopping
-                and not self._stream_audio_truncated
-            ):
-                try:
-                    refined = list(self.refiner.refine(self._speech, source_language))
-                    if refined:
-                        finals = refined
-                except Exception as exc:
-                    if on_error is not None:
-                        on_error(exc)
+            if finals:
+                audio = list(self._speech)
+                truncated = self._stream_audio_truncated
+                self._speech.clear()
+                self._stream_audio_truncated = False
+                if (
+                    self.refiner is not None
+                    and audio
+                    and not truncated
+                    and not stopping
+                    and not capture_errors
+                ):
+                    # Capture has ended, so this final tail can be refined here
+                    # without risking loss of new audio from the device.
+                    try:
+                        refined = list(self.refiner.refine(audio, source_language))
+                        if refined:
+                            finals = refined
+                    except Exception as exc:
+                        if on_error is not None:
+                            on_error(exc)
+                for segment in finals:
+                    schedule_final(segment, [], True)
+
             self._speech.clear()
             self._stream_audio_truncated = False
-            self._translate_segments(finals, on_translation, on_error)
+
+            if refiner_thread is not None:
+                # Queue sentinel after all scheduled jobs, then drain completed
+                # results in sequence order before returning from the session.
+                refinement_jobs.put(sentinel)
+                refiner_thread.join()
+                refiner_shutdown = True
+                drain_refinement_results()
+                emit_ready_finals()
 
             if capture_errors and on_error is not None:
                 on_error(capture_errors[0])
@@ -320,6 +387,12 @@ class TranslationPipeline:
         finally:
             producer_stop.set()
             producer.join(timeout=2.0)
+            if refiner_thread is not None and not refiner_shutdown:
+                try:
+                    refinement_jobs.put(sentinel, timeout=0.5)
+                except queue.Full:
+                    pass
+                refiner_thread.join(timeout=2.0)
 
     def run(
         self,
