@@ -167,3 +167,41 @@ def test_streaming_capture_continues_while_whisper_refines():
     assert all(item.translated_text == "hola" for item in provisional_results)
     assert refiner.capture_advanced_during_refinement
     assert errors and "end of test audio" in str(errors[0])
+
+
+
+def test_streaming_preview_resets_after_finalized_utterance():
+    from app.domain.ports import StreamingASREngine
+
+    class ThreeUtteranceEngine(StreamingASREngine):
+        def start_stream(self):
+            pass
+
+        def accept_audio(self, chunk):
+            if chunk.start == 0:
+                return [TranscriptSegment("hello", 0, 1, "en", is_final=False)]
+            if chunk.start == 1:
+                return [TranscriptSegment("hello", 0, 1, "en", is_final=True)]
+            return [TranscriptSegment("hello", 0, 1, "en", is_final=False)]
+
+        def finish_stream(self):
+            return []
+
+        def transcribe(self, chunks):
+            return []
+
+    source = FakeSource([
+        AudioChunk(b"speech", 16000, 1, float(i)) for i in range(3)
+    ])
+    pipeline = TranslationPipeline(
+        source, FakeVAD(), ThreeUtteranceEngine(), FakeTranslation()
+    )
+    results = []
+    errors = []
+    pipeline.run(results.append, lambda: False, errors.append)
+
+    provisional = [result for result in results if not result.source.is_final]
+    finalized = [result for result in results if result.source.is_final]
+    assert len(provisional) == 2
+    assert len(finalized) == 1
+    assert all(result.source.text == "hello" for result in provisional)
