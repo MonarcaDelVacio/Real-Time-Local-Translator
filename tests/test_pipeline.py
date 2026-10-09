@@ -98,3 +98,56 @@ def test_pipeline_stops_source_when_read_fails():
     with pytest.raises(RuntimeError, match="audio device failed"):
         p.run(lambda _: None, lambda: False)
     assert source.stopped
+
+def test_streaming_capture_continues_while_whisper_refines():
+    import time
+
+    from app.domain.ports import ASRRefiner, StreamingASREngine
+
+    class StreamingSource(FakeSource):
+        read_count = 0
+
+        def read(self):
+            if not self.chunks:
+                raise RuntimeError("end of test audio")
+            self.read_count += 1
+            return self.chunks.pop(0)
+
+    class StreamingEngine(StreamingASREngine):
+        def start_stream(self):
+            pass
+
+        def accept_audio(self, chunk):
+            return [TranscriptSegment("hello", 0, 1, "en", is_final=True)]
+
+        def finish_stream(self):
+            return []
+
+        def transcribe(self, chunks):
+            return []
+
+    class SlowRefiner(ASRRefiner):
+        def __init__(self, source):
+            self.source = source
+            self.capture_advanced_during_refinement = False
+
+        def refine(self, chunks, language_code):
+            # The capture producer should read ahead while this simulated
+            # refinement is busy instead of losing the audio window.
+            time.sleep(0.15)
+            self.capture_advanced_during_refinement = self.source.read_count >= 5
+            return [TranscriptSegment("hello refined", 0, 1, language_code)]
+
+    source = StreamingSource([
+        AudioChunk(b"speech", 16000, 1, float(i)) for i in range(5)
+    ])
+    refiner = SlowRefiner(source)
+    p = TranslationPipeline(source, FakeVAD(), StreamingEngine(), FakeTranslation(), refiner=refiner)
+    results = []
+    errors = []
+    p.run(results.append, lambda: False, errors.append)
+
+    final_results = [item for item in results if item.source.is_final]
+    assert len(final_results) == 5
+    assert refiner.capture_advanced_during_refinement
+    assert errors and "end of test audio" in str(errors[0])
