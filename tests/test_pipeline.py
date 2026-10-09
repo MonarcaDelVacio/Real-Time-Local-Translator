@@ -178,9 +178,9 @@ def test_streaming_preview_resets_after_finalized_utterance():
             pass
 
         def accept_audio(self, chunk):
-            if chunk.start == 0:
+            if chunk.timestamp == 0:
                 return [TranscriptSegment("hello", 0, 1, "en", is_final=False)]
-            if chunk.start == 1:
+            if chunk.timestamp == 1:
                 return [TranscriptSegment("hello", 0, 1, "en", is_final=True)]
             return [TranscriptSegment("hello", 0, 1, "en", is_final=False)]
 
