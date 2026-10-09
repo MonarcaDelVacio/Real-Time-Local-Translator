@@ -73,9 +73,16 @@ def _seed_bundled_models(root: Path) -> None:
             shutil.copytree(bundled, destination)
     bundled_argos = source / "argos"
     destination_argos = root / "argos"
-    if bundled_argos.is_dir() and not destination_argos.exists():
-        destination_argos.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(bundled_argos, destination_argos)
+    if bundled_argos.is_dir():
+        try:
+            argos_is_ready = _argos_translations_ready(root)
+        except Exception:
+            argos_is_ready = False
+        if not argos_is_ready:
+            if destination_argos.exists():
+                shutil.rmtree(destination_argos, ignore_errors=True)
+            destination_argos.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(bundled_argos, destination_argos)
 
 
 def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
@@ -276,7 +283,14 @@ def ensure_models(status=lambda _: None) -> None:
         installed = _argos_installed_pairs(root)
         ready = _argos_ready_pairs(root)
     except Exception as exc:
-        raise RuntimeError(f"No se pudo inspeccionar la instalación local de Argos: {exc}") from exc
+        # This folder is dedicated to this app's currently supported en/es
+        # packages. If Argos cannot even enumerate it, rebuild that folder and
+        # let the normal package installer restore both required directions.
+        status(f"Instalación de Argos dañada; se reconstruirá: {exc}")
+        shutil.rmtree(root / "argos", ignore_errors=True)
+        (root / "argos").mkdir(parents=True, exist_ok=True)
+        installed = set()
+        ready = set()
 
     # A package can be listed as installed while its model files are unusable.
     # Remove only that app-managed package and reinstall the missing direction.
