@@ -290,9 +290,6 @@ def run_gui(application) -> int:
     output = QTextEdit()
     output.setReadOnly(True)
     output.setAcceptRichText(True)
-    # Bound the rendered session history so long meetings cannot grow the GUI
-    # document indefinitely. The original transcript is persisted separately.
-    output.document().setMaximumBlockCount(3000)
     output.setPlaceholderText(
         "Cuando estés listo, pulsa «Iniciar» y reproduce una voz por los altavoces o auriculares de Windows.\n\n"
         "Las traducciones finales aparecerán aquí automáticamente."
@@ -540,12 +537,12 @@ def run_gui(application) -> int:
             cursor = output.textCursor()
             if provisional_start is None or provisional_end is None:
                 cursor.movePosition(QTextCursor.MoveOperation.End)
-                provisional_start = QTextCursor(cursor)
+                provisional_start = cursor.position()
             else:
-                cursor.setPosition(provisional_start.position())
-                cursor.setPosition(provisional_end.position(), QTextCursor.MoveMode.KeepAnchor)
+                cursor.setPosition(provisional_start)
+                cursor.setPosition(provisional_end, QTextCursor.MoveMode.KeepAnchor)
             cursor.insertHtml(live_entry)
-            provisional_end = QTextCursor(cursor)
+            provisional_end = cursor.position()
             output.setTextCursor(cursor)
             scroll_output_to_bottom()
             status.setText("●  Transcribiendo y traduciendo en vivo…")
@@ -554,8 +551,8 @@ def run_gui(application) -> int:
         # Remove the temporary live entry before inserting the finalized phrase.
         if provisional_start is not None and provisional_end is not None:
             cursor = output.textCursor()
-            cursor.setPosition(provisional_start.position())
-            cursor.setPosition(provisional_end.position(), QTextCursor.MoveMode.KeepAnchor)
+            cursor.setPosition(provisional_start)
+            cursor.setPosition(provisional_end, QTextCursor.MoveMode.KeepAnchor)
             cursor.removeSelectedText()
             output.setTextCursor(cursor)
             provisional_start = None
