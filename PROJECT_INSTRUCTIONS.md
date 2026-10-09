@@ -53,7 +53,7 @@ External engines must remain behind replaceable interfaces.
 - The capture queue is bounded. When overloaded, old audio may be dropped to prevent unbounded latency; long-session stress tests remain required.
 - Installed builds store writable model assets under the user's local application data directory. Optional bundled models must be copied there before use.
 - Current model sources are mixed: Sherpa/Nemotron from GitHub Releases, Whisper Small from Hugging Face, and Argos packages from the Argos package index. Do not claim all model files come from this project's GitHub repository until a release-asset mirror is implemented.
-- CI success verifies automated tests and packaging only. It does not certify audio-device compatibility, latency, or accuracy on real hardware.
+- CI success verifies automated tests and packaging only. It does not certify audio-device compatibility, latency, or accuracy on real hardware. Windows development/build dependencies are constrained to a reviewed CPython 3.11 snapshot; update the pins only after reviewing a complete successful CI run.
 
 ## Privacy
 Audio, transcripts, and translations remain local by default. The application must never silently upload meeting content.

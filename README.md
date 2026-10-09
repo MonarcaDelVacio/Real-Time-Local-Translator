@@ -32,10 +32,6 @@ El idioma de origen se selecciona según el idioma de destino en el modo actual 
 - NumPy y pytest
 - PyInstaller e Inno Setup
 
-## Estado de la versión
-
-El proyecto sigue siendo experimental. Las compilaciones automatizadas verifican las pruebas y el empaquetado, pero todavía es necesario validar el audio, la latencia, el consumo y la recuperación de modelos en equipos Windows reales.
-
 ## Probar la versión descargable
 
 La compilación Windows se genera mediante GitHub Actions. El instalador resultante se publica como artefacto del workflow. Hasta que el workflow termine correctamente, no debe considerarse un instalador validado.
@@ -57,7 +53,7 @@ El instalador no requiere Python.
 
 Después puedes probar el recorrido contrario seleccionando **English** y reproduciendo español.
 
-Si la preparación inicial falla, la aplicación muestra un cuadro de error con texto seleccionable y botón para copiarlo.
+Si la preparación inicial falla, la aplicación muestra un cuadro de error con texto seleccionable, botón para copiarlo y opción para reintentar.
 
 ## Desarrollo
 
@@ -82,7 +78,8 @@ El proyecto sigue siendo experimental. El CI valida pruebas automatizadas y empa
 - [x] SHA-256 generado para el instalador de cada compilación.
 - [ ] Validación de extremo a extremo en equipos Windows reales.
 - [ ] Pruebas de estrés prolongadas para cuantificar pérdida de audio y latencia.
-- [ ] Bloqueo completo de versiones de dependencias para builds reproducibles.
+- [x] Restricciones de versiones para Windows/Python 3.11 y manifiesto de dependencias en cada build.
+- [ ] Fijar también la versión de pip y validar builds reproducibles en otros entornos.
 - [ ] Firma digital del instalador.
 - [ ] Centralizar todos los modelos en activos propios de GitHub Releases.
 

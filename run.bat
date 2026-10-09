@@ -12,7 +12,7 @@ echo.
 
 set "PYTHON_CMD="
 where py >nul 2>&1
-if not errorlevel 1 set "PYTHON_CMD=py -3"
+if not errorlevel 1 set "PYTHON_CMD=py -3.11"
 
 if not defined PYTHON_CMD (
     where python >nul 2>&1
@@ -21,12 +21,19 @@ if not defined PYTHON_CMD (
 
 if not defined PYTHON_CMD (
     echo [ERROR] Python 3 was not found.
-    echo Install Python 3.11 or newer and make sure it is in PATH.
+    echo Install Python 3.11 and make sure it is in PATH.
     goto :FAIL
 )
 
 echo [OK] Python command detected: %PYTHON_CMD%
 %PYTHON_CMD% --version
+if errorlevel 1 goto :FAIL
+%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info[:2] == (3,11) else 1)"
+if errorlevel 1 (
+    echo [ERROR] This developer environment is pinned for Python 3.11.
+    echo Install Python 3.11 or run scripts\\run_dev.ps1.
+    goto :FAIL
+)
 echo.
 
 if not exist ".venv\Scripts\python.exe" (
