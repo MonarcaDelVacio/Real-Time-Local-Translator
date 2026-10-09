@@ -4,20 +4,29 @@ import threading
 
 
 def append_transcript_text(path, text: str) -> None:
-    """Append only recognized words, formatting sentence boundaries for reading."""
+    """Append normalized recognized text without fragile text-mode seeks."""
+    from pathlib import Path
+
     clean_text = " ".join(text.split())
     if not clean_text:
         return
 
-    with open(path, "a+", encoding="utf-8") as transcript_file:
-        transcript_file.seek(0, 2)
-        file_size = transcript_file.tell()
-        separator = ""
-        if file_size:
-            transcript_file.seek(file_size - 1)
-            last_char = transcript_file.read(1)
-            separator = "\n\n" if last_char in ".!?…" else " "
-        transcript_file.seek(0, 2)
+    target = Path(path)
+    separator = ""
+    if target.is_file() and target.stat().st_size:
+        # TextIOWrapper.tell() returns an opaque seek cookie, not a byte/character
+        # offset. Read a few bytes from the end instead; sentence punctuation is
+        # ASCII except for the UTF-8 ellipsis.
+        size = target.stat().st_size
+        with target.open("rb") as transcript_file:
+            transcript_file.seek(max(0, size - 3))
+            tail = transcript_file.read()
+        if tail.endswith((b".", b"!", b"?", "…".encode("utf-8"))):
+            separator = "\n\n"
+        else:
+            separator = " "
+
+    with target.open("a", encoding="utf-8") as transcript_file:
         transcript_file.write(separator + clean_text)
 
 
