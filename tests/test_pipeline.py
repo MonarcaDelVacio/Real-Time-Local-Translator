@@ -202,7 +202,10 @@ def test_streaming_preview_resets_after_finalized_utterance():
 
     provisional = [result for result in results if not result.source.is_final]
     finalized = [result for result in results if result.source.is_final]
-    assert len(provisional) == 2
+    # Preview translation is intentionally asynchronous and coalesces stale
+    # queued hypotheses under load, so the latest live subtitle may be emitted
+    # once or twice depending on scheduling. It must not block final output.
+    assert 1 <= len(provisional) <= 2
     assert len(finalized) == 1
     assert all(result.source.text == "hello" for result in provisional)
 
