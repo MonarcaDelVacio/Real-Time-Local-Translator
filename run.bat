@@ -57,7 +57,7 @@ echo [3/5] Checking/installing application dependencies...
 echo First run may take a few minutes. Already-installed packages are reused.
 echo.
 
-"%VENV_PY%" -m pip install -r "requirements\base.txt"
+"%VENV_PY%" -m pip install -r "requirements\base.txt" -c "requirements\constraints-win-py311.txt"
 if errorlevel 1 (
     echo [ERROR] Runtime dependencies could not be installed.
     goto :FAIL

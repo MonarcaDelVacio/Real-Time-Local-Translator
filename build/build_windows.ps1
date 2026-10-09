@@ -28,7 +28,7 @@ Write-Host "Checking runtime imports..."
 if ($LASTEXITCODE -ne 0) { throw "Runtime import check failed." }
 
 Write-Host "Installing/updating PyInstaller..."
-& $python -m pip install --upgrade pyinstaller
+& $python -m pip install -r requirements\build.txt -c requirements\constraints-win-py311.txt
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller installation failed." }
 
 Write-Host "Building Windows application..."
