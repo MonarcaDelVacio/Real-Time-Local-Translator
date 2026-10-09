@@ -12,18 +12,11 @@ if (-not (Test-Path $python)) {
 }
 
 if ($IncludeModels) {
-    Write-Host "Preparing local model set for a self-contained build..."
-    $requiredWhisper = @("config.json", "model.bin", "tokenizer.json", "vocabulary.txt", "preprocessor_config.json")
-    $whisperReady = Test-Path "models\.ready"
-    foreach ($name in $requiredWhisper) {
-        if (-not (Test-Path ("models\whisper\small\" + $name))) { $whisperReady = $false }
-    }
-    if (-not $whisperReady) {
-        & $python scripts/prepare_streaming_models.py
-        if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
-    } else {
-        Write-Host "Local model readiness marker found."
-    }
+    Write-Host "Verifying and repairing the complete local model set for a self-contained build..."
+    # The shared manager checks Sherpa, Whisper and both Argos directions; a
+    # stale .ready marker must never bypass verification of any required asset.
+    & $python scripts/prepare_streaming_models.py
+    if ($LASTEXITCODE -ne 0) { throw "Local model preparation failed." }
     $env:RTL_BUNDLE_MODELS = "1"
 } else {
     Write-Host "Building without bundled models. The installed models directory will be reused."
