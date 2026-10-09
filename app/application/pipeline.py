@@ -449,18 +449,15 @@ class TranslationPipeline:
                 except queue.Full:
                     pass
                 refiner_thread.join(timeout=1.0)
-            preview_stop.set()
-            try:
-                while True:
-                    preview_jobs.get_nowait()
-            except queue.Empty:
-                pass
-            try:
-                preview_jobs.put_nowait(sentinel)
-            except queue.Full:
-                pass
+            # Let the newest pending subtitle finish during normal shutdown;
+            # dropping the queue here can erase the last words of a short session.
             if preview_thread is not None:
-                preview_thread.join(timeout=0.5)
+                try:
+                    preview_jobs.put(sentinel, timeout=0.5)
+                except queue.Full:
+                    pass
+                preview_thread.join(timeout=1.0)
+            preview_stop.set()
 
     def run(
         self,
