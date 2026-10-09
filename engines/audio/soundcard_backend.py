@@ -33,18 +33,26 @@ class SoundCardSystemAudioSource(AudioSource):
                 blocksize=self.block_frames,
             )
             self._recorder = self._context.__enter__()
-        except Exception:
-            if self.channels != 1:
-                self.channels = 1
+        except Exception as stereo_error:
+            self._context = self._recorder = None
+            if self.channels == 1:
+                raise RuntimeError(
+                    f"Could not open Windows loopback capture in mono: {stereo_error}"
+                ) from stereo_error
+            self.channels = 1
+            try:
                 self._context = microphone.recorder(
                     samplerate=self.sample_rate,
                     channels=[0],
                     blocksize=self.block_frames,
                 )
                 self._recorder = self._context.__enter__()
-            else:
+            except Exception as mono_error:
                 self._context = self._recorder = None
-                raise
+                raise RuntimeError(
+                    "Could not open Windows loopback capture in stereo or mono. "
+                    f"Stereo error: {stereo_error}; mono error: {mono_error}"
+                ) from mono_error
         self._started = True
 
     def read(self) -> AudioChunk:
