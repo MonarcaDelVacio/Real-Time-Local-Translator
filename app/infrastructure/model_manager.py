@@ -121,6 +121,25 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination, members=members)
 
 
+def _status_tqdm_class(status):
+    """Adapt Hugging Face download progress to the setup dialog's status signal."""
+    from tqdm.auto import tqdm
+
+    class StatusTqdm(tqdm):
+        def update(self, n=1):
+            result = super().update(n)
+            total = getattr(self, "total", None)
+            if total:
+                percent = min(100, int(self.n * 100 / total))
+                if percent != getattr(self, "_rtl_last_percent", None):
+                    self._rtl_last_percent = percent
+                    description = getattr(self, "desc", None) or "archivo del modelo"
+                    status(f"Descargando Whisper… {percent}% ({description})")
+            return result
+
+    return StatusTqdm
+
+
 def _download_archive(url: str, destination: Path, status) -> None:
     import time
 
@@ -287,6 +306,7 @@ def ensure_models(status=lambda _: None) -> None:
             local_dir=str(whisper),
             allow_patterns=list(WHISPER_REQUIRED),
             force_download=True,
+            tqdm_class=_status_tqdm_class(status),
         )
     missing = [
         name for name, minimum in WHISPER_MIN_BYTES.items()
