@@ -156,29 +156,69 @@ class TranslationPipeline:
         stop_requested: Callable[[], bool],
         on_error: Callable[[Exception], None] | None,
     ) -> None:
+        import queue
+        import threading
+
         engine = self.asr
         if not isinstance(engine, StreamingASREngine):
             raise TypeError("Streaming pipeline requires a streaming ASR engine")
 
-        # Current Preview supports English↔Spanish. The selected target lets us
-        # know the expected source language, so avoid auto-detection mistakes.
         source_language = "en" if self.target_language == "es" else "es"
         set_source_language = getattr(engine, "set_source_language", None)
         if set_source_language is not None:
             set_source_language(source_language)
 
-        engine.start_stream()
-        try:
-            while not stop_requested():
-                chunk = self.source.read()
+        # Audio capture runs independently from ASR/Whisper. Refinement can take
+        # several seconds, so it must not stop the device from being read.
+        audio_queue: queue.Queue = queue.Queue(maxsize=max(128, self.max_buffer_chunks * 2))
+        sentinel = object()
+        producer_stop = threading.Event()
+        capture_errors: list[Exception] = []
 
-                # Partial ASR is useful for responsiveness, but MUST NOT be
-                # sent through Argos: translating incomplete hypotheses creates
-                # false words and unstable translations. The GUI can still use
-                # these partials as live transcription/status.
+        def capture_audio() -> None:
+            try:
+                while not producer_stop.is_set() and not stop_requested():
+                    chunk = self.source.read()
+                    while True:
+                        try:
+                            audio_queue.put(chunk, timeout=0.1)
+                            break
+                        except queue.Full:
+                            # Back-pressure is bounded. On abnormal consumer
+                            # shutdown, allow the producer to exit cleanly.
+                            if producer_stop.is_set():
+                                return
+            except Exception as exc:
+                capture_errors.append(exc)
+            finally:
+                while True:
+                    try:
+                        audio_queue.put(sentinel, timeout=0.1)
+                        break
+                    except queue.Full:
+                        if producer_stop.is_set():
+                            return
+
+        engine.start_stream()
+        producer = threading.Thread(
+            target=capture_audio,
+            name="RTL-Audio-Capture",
+            daemon=True,
+        )
+        producer.start()
+        try:
+            while True:
+                try:
+                    item = audio_queue.get(timeout=0.1)
+                except queue.Empty:
+                    if not producer.is_alive():
+                        break
+                    continue
+                if item is sentinel:
+                    break
+
+                chunk = item
                 segments = list(engine.accept_audio(chunk))
-                # Keep exact audio for the current utterance so a stronger
-                # offline model can correct the completed streaming transcript.
                 self._append_stream_audio(chunk)
 
                 for segment in segments:
@@ -188,8 +228,13 @@ class TranslationPipeline:
                         self._speech.clear()
                         self._stream_audio_truncated = False
                         final_segments = [segment]
-                        # Never replace a complete streaming result with a partial audio window.
-                        if self.refiner is not None and not truncated:
+                        # If the user is stopping, preserve the fast shutdown
+                        # path and use the already-decoded streaming transcript.
+                        if (
+                            self.refiner is not None
+                            and not truncated
+                            and not stop_requested()
+                        ):
                             try:
                                 refined = list(self.refiner.refine(audio, source_language))
                                 if refined:
@@ -208,12 +253,14 @@ class TranslationPipeline:
                             )
                         )
 
-            # Stopping is a user-requested fast path: do not launch a second,
-            # potentially expensive Whisper pass over the entire buffered session.
-            # finish_stream() still flushes any text already decoded by streaming ASR.
-            stopping = stop_requested()
+            stopping = stop_requested() or bool(capture_errors)
             finals = list(engine.finish_stream())
-            if self._speech and self.refiner is not None and not stopping and not self._stream_audio_truncated:
+            if (
+                self._speech
+                and self.refiner is not None
+                and not stopping
+                and not self._stream_audio_truncated
+            ):
                 try:
                     refined = list(self.refiner.refine(self._speech, source_language))
                     if refined:
@@ -224,11 +271,17 @@ class TranslationPipeline:
             self._speech.clear()
             self._stream_audio_truncated = False
             self._translate_segments(finals, on_translation, on_error)
+
+            if capture_errors and on_error is not None:
+                on_error(capture_errors[0])
         except Exception as exc:
             if on_error is not None:
                 on_error(exc)
             else:
                 raise
+        finally:
+            producer_stop.set()
+            producer.join(timeout=2.0)
 
     def run(
         self,
