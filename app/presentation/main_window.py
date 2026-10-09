@@ -357,7 +357,6 @@ def run_gui(application) -> int:
     history_row.setSpacing(12)
     history_row.addWidget(original_panel, 1)
     history_row.addWidget(translated_panel, 1)
-    original_panel.setVisible(show_original.isChecked())
 
     globals_for_theme["output"] = output
     globals_for_theme["original_output"] = original_output
@@ -393,6 +392,7 @@ def run_gui(application) -> int:
     show_original = QCheckBox("Mostrar también la transcripción original")
     show_original.setChecked(settings.value("show_original", True, type=bool))
     show_original.setToolTip("Mostrar el texto reconocido antes de la traducción")
+    original_panel.setVisible(show_original.isChecked())
     settings_layout.addWidget(show_original)
 
     font_row = QHBoxLayout()
