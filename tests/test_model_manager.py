@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _remove_argos_installation, _safe_extract, _whisper_config_valid
+from app.infrastructure.model_manager import WHISPER_REQUIRED, _assets_complete, _complete, _remove_argos_installation, _safe_extract, _whisper_config_valid
 
 
 def test_complete_rejects_empty_required_files(tmp_path):
@@ -99,3 +99,16 @@ def test_remove_argos_installation_refuses_external_package_path(tmp_path):
 
     assert not _remove_argos_installation(root, ("en", "es"), installed)
     assert external.exists()
+
+
+def test_assets_complete_rejects_nonempty_but_truncated_model_file(tmp_path):
+    model = tmp_path / "whisper"
+    model.mkdir()
+    weights = model / "model.bin"
+    weights.write_bytes(b"short but nonempty")
+
+    assert _complete(model, ("model.bin",))
+    assert not _assets_complete(model, {"model.bin": 100})
+
+    weights.write_bytes(b"x" * 100)
+    assert _assets_complete(model, {"model.bin": 100})

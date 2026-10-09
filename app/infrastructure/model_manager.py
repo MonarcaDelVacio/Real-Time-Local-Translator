@@ -24,6 +24,18 @@ WHISPER_REQUIRED = (
     "vocabulary.txt",
 )
 ARGOS_REQUIRED = (("en", "es"), ("es", "en"))
+SHERPA_MIN_BYTES = {
+    "encoder.int8.onnx": 1_000_000,
+    "decoder.int8.onnx": 100_000,
+    "joiner.int8.onnx": 100_000,
+    "tokens.txt": 100,
+}
+WHISPER_MIN_BYTES = {
+    "config.json": 100,
+    "model.bin": 100_000_000,
+    "tokenizer.json": 1_000,
+    "vocabulary.txt": 100,
+}
 
 
 def _ensure_gui_stdio() -> None:
@@ -41,6 +53,14 @@ def _complete(path: Path, names: tuple[str, ...]) -> bool:
     return path.is_dir() and all(
         (path / name).is_file() and (path / name).stat().st_size > 0
         for name in names
+    )
+
+
+def _assets_complete(path: Path, minimum_sizes: dict[str, int]) -> bool:
+    """Reject missing, empty, or suspiciously truncated required model files."""
+    return path.is_dir() and all(
+        (path / name).is_file() and (path / name).stat().st_size >= minimum
+        for name, minimum in minimum_sizes.items()
     )
 
 
@@ -152,7 +172,7 @@ def _download_sherpa(destination: Path, status) -> None:
             _safe_extract(archive, staging)
 
         found = next(
-            (p.parent for p in staging.rglob("tokens.txt") if _complete(p.parent, SHERPA_REQUIRED)),
+            (p.parent for p in staging.rglob("tokens.txt") if _assets_complete(p.parent, SHERPA_MIN_BYTES)),
             None,
         )
         if found is None:
@@ -160,7 +180,7 @@ def _download_sherpa(destination: Path, status) -> None:
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(found, destination)
-        if not _complete(destination, SHERPA_REQUIRED):
+        if not _assets_complete(destination, SHERPA_MIN_BYTES):
             raise RuntimeError("El modelo Sherpa-ONNX no superó la verificación posterior a la extracción.")
     finally:
         archive_path.unlink(missing_ok=True)
@@ -229,10 +249,10 @@ def _remove_argos_installation(root: Path, pair: tuple[str, str], installed_pack
 def models_ready() -> bool:
     _ensure_gui_stdio()
     root = models_root()
-    if not _complete(root / "sherpa" / MODEL, SHERPA_REQUIRED):
+    if not _assets_complete(root / "sherpa" / MODEL, SHERPA_MIN_BYTES):
         return False
     whisper = root / "whisper" / "small"
-    if not _complete(whisper, WHISPER_REQUIRED) or not _whisper_config_valid(whisper):
+    if not _assets_complete(whisper, WHISPER_MIN_BYTES) or not _whisper_config_valid(whisper):
         return False
     try:
         return _argos_translations_ready(root)
@@ -249,13 +269,13 @@ def ensure_models(status=lambda _: None) -> None:
     sherpa = root / "sherpa" / MODEL
     whisper = root / "whisper" / "small"
 
-    if not _complete(sherpa, SHERPA_REQUIRED):
+    if not _assets_complete(sherpa, SHERPA_MIN_BYTES):
         _download_sherpa(sherpa, status)
-    if not _complete(sherpa, SHERPA_REQUIRED):
+    if not _assets_complete(sherpa, SHERPA_MIN_BYTES):
         raise RuntimeError("El modelo Sherpa-ONNX sigue incompleto después de la descarga.")
     status("Modelo ASR streaming verificado.")
 
-    if not _complete(whisper, WHISPER_REQUIRED) or not _whisper_config_valid(whisper):
+    if not _assets_complete(whisper, WHISPER_MIN_BYTES) or not _whisper_config_valid(whisper):
         status("Descargando o reparando el modelo Whisper de refinamiento…")
         from huggingface_hub import snapshot_download
 
@@ -268,9 +288,15 @@ def ensure_models(status=lambda _: None) -> None:
             allow_patterns=list(WHISPER_REQUIRED),
             force_download=True,
         )
-    missing = [name for name in WHISPER_REQUIRED if not (whisper / name).is_file() or (whisper / name).stat().st_size == 0]
+    missing = [
+        name for name, minimum in WHISPER_MIN_BYTES.items()
+        if not (whisper / name).is_file() or (whisper / name).stat().st_size < minimum
+    ]
     if missing:
-        raise RuntimeError("El modelo Whisper está incompleto; faltan: " + ", ".join(missing))
+        raise RuntimeError(
+            "El modelo Whisper está incompleto o parece truncado; faltan o son demasiado pequeños: "
+            + ", ".join(missing)
+        )
     if not _whisper_config_valid(whisper):
         raise RuntimeError("La configuración local de Whisper sigue dañada después de intentar repararla.")
     status("Modelo Whisper verificado.")
