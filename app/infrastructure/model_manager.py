@@ -56,6 +56,14 @@ def _complete(path: Path, names: tuple[str, ...]) -> bool:
     )
 
 
+def _remove_path(path: Path) -> None:
+    """Remove a corrupt app-owned path whether it is a file, directory, or symlink."""
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+
+
 def _assets_complete(path: Path, minimum_sizes: dict[str, int]) -> bool:
     """Reject missing, empty, or suspiciously truncated required model files."""
     return path.is_dir() and all(
@@ -87,8 +95,8 @@ def _seed_bundled_models(root: Path) -> None:
         if _assets_complete(destination, minimum_sizes):
             continue
         if _assets_complete(bundled, minimum_sizes):
-            if destination.exists():
-                shutil.rmtree(destination, ignore_errors=True)
+            if destination.exists() or destination.is_symlink():
+                _remove_path(destination)
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(bundled, destination)
     bundled_argos = source / "argos"
@@ -99,8 +107,8 @@ def _seed_bundled_models(root: Path) -> None:
         except Exception:
             argos_is_ready = False
         if not argos_is_ready:
-            if destination_argos.exists():
-                shutil.rmtree(destination_argos, ignore_errors=True)
+            if destination_argos.exists() or destination_argos.is_symlink():
+                _remove_path(destination_argos)
             destination_argos.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(bundled_argos, destination_argos)
 
@@ -196,8 +204,8 @@ def _download_sherpa(destination: Path, status) -> None:
         )
         if found is None:
             raise RuntimeError("El modelo Sherpa-ONNX se descargó, pero está incompleto.")
-        if destination.exists():
-            shutil.rmtree(destination)
+        if destination.exists() or destination.is_symlink():
+            _remove_path(destination)
         shutil.copytree(found, destination)
         if not _assets_complete(destination, SHERPA_MIN_BYTES):
             raise RuntimeError("El modelo Sherpa-ONNX no superó la verificación posterior a la extracción.")
@@ -256,11 +264,11 @@ def _remove_argos_installation(root: Path, pair: tuple[str, str], installed_pack
         path = Path(raw_path).resolve()
         if path == package_root or package_root not in path.parents:
             continue
+        if path.is_symlink() or path.is_file():
+            path.unlink(missing_ok=True)
+            return True
         if path.is_dir():
             shutil.rmtree(path)
-            return True
-        if path.is_file():
-            path.unlink()
             return True
     return False
 
@@ -333,7 +341,7 @@ def ensure_models(status=lambda _: None) -> None:
         # packages. If Argos cannot even enumerate it, rebuild that folder and
         # let the normal package installer restore both required directions.
         status(f"Instalación de Argos dañada; se reconstruirá: {exc}")
-        shutil.rmtree(root / "argos", ignore_errors=True)
+        _remove_path(root / "argos")
         (root / "argos").mkdir(parents=True, exist_ok=True)
         installed = set()
         ready = set()
