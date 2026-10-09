@@ -107,8 +107,17 @@ def test_streaming_capture_continues_while_whisper_refines():
     class StreamingSource(FakeSource):
         read_count = 0
 
+        def __init__(self, chunks):
+            super().__init__(chunks)
+            import threading
+            self.refinement_finished = threading.Event()
+
         def read(self):
             if not self.chunks:
+                # Keep the simulated live capture active until refinement has
+                # started and completed; otherwise the test creates an
+                # artificial end-of-stream error before refinement can run.
+                self.refinement_finished.wait(timeout=2)
                 raise RuntimeError("end of test audio")
             self.read_count += 1
             return self.chunks.pop(0)
@@ -136,6 +145,7 @@ def test_streaming_capture_continues_while_whisper_refines():
             # refinement is busy instead of losing the audio window.
             time.sleep(0.15)
             self.capture_advanced_during_refinement = self.source.read_count >= 5
+            self.source.refinement_finished.set()
             return [TranscriptSegment("hello refined", 0, 1, language_code)]
 
     source = StreamingSource([
