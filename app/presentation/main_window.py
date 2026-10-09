@@ -421,10 +421,11 @@ def run_gui(application) -> int:
         theme_combo.setEnabled(True)
 
     def start_session():
-        nonlocal worker
+        nonlocal worker, transcript_path
         if worker is not None and worker.isRunning():
             return
         save_preferences()
+        transcript_path = None
         worker = Worker(application, target.currentData())
         initialization.setVisible(True)
         initialization.setFormat("Inicializando motores locales…")
@@ -470,7 +471,7 @@ def run_gui(application) -> int:
             folder = transcripts_directory()
             folder.mkdir(parents=True, exist_ok=True)
             if transcript_path is None:
-                transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+                transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
                 transcript_path.write_text(
                     "Transcripción original — Real-Time Local Translator\\n"
                     f"Sesión iniciada: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
