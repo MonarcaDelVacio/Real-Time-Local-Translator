@@ -35,4 +35,9 @@ Write-Host "Building Windows application..."
 & $python -m PyInstaller "build\RealTimeLocalTranslator.spec" --noconfirm --clean
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 
+$packagedExe = Join-Path (Get-Location) "dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"
+Write-Host "Running frozen-app import smoke test..."
+& $packagedExe --self-test
+if ($LASTEXITCODE -ne 0) { throw "Packaged application self-test failed with exit code $LASTEXITCODE." }
+
 Write-Host "Build complete: dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"
