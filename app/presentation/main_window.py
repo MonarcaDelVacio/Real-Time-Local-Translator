@@ -293,13 +293,11 @@ def run_gui(application) -> int:
         "Las traducciones finales aparecerán aquí automáticamente."
     )
     globals_for_theme["output"] = output
-    globals_for_theme["live_preview"] = live_preview
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
     layout.addWidget(initialization)
     layout.addWidget(toolbar)
-    layout.addWidget(live_preview)
     layout.addWidget(output, 1)
     window.setCentralWidget(central)
 
@@ -366,6 +364,10 @@ def run_gui(application) -> int:
 
     worker = None
     transcript_path = None
+    # Keep finalized entries separate from the changing provisional sentence,
+    # so every ASR revision updates in place instead of duplicating lines.
+    output_entries: list[str] = []
+    provisional_entry = ""
 
     def transcripts_directory():
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -488,18 +490,41 @@ def run_gui(application) -> int:
         always_on_top_box.setEnabled(False)
         theme_combo.setEnabled(False)
 
+    def render_output():
+        output.setHtml("".join(output_entries) + provisional_entry)
+        # Keep the newest text visible as it arrives, without requiring manual scrolling.
+        scrollbar = output.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
     def append_translation(lang, translated, source, is_final):
-        nonlocal transcript_path
+        nonlocal transcript_path, provisional_entry
+        from html import escape
+
+        source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
+        translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
+        source_html = (
+            f'<div style="color:{source_color};">{escape(source)}</div>'
+            if show_original.isChecked() and source and source.strip()
+            else ""
+        )
         if not is_final:
-            # Show the changing translation while streaming ASR revises its hypothesis.
-            live_preview.setText(f"🎙 Traducción en vivo (provisional): {translated}")
-            live_preview.setVisible(True)
-            status.setText("●  Traduciendo en vivo… el texto se confirmará al terminar la frase")
+            # Render the evolving ASR/translation hypothesis at the end of the
+            # main history. Revisions replace this block instead of adding duplicates.
+            provisional_entry = (
+                f'<div style="margin-bottom:14px; padding:8px; '
+                f'border-left:3px solid #3b82f6;">'
+                f'{source_html}'
+                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">'
+                f'{escape(translated)}</div>'
+                f'<div style="margin-top:3px; color:{source_color}; font-size:11px;">En vivo · provisional</div>'
+                f'</div>'
+            )
+            render_output()
+            status.setText("●  Transcribiendo y traduciendo en vivo…")
             return
 
-        live_preview.clear()
-        live_preview.setVisible(False)
-        from html import escape
+        # A final result replaces the provisional block with one stable entry.
+        provisional_entry = ""
 
         # Persist only finalized original-language text, independently of whether
         # the user chooses to display the original text in the UI.
@@ -517,20 +542,20 @@ def run_gui(application) -> int:
                 # crash the GUI slot; surface the save failure instead.
                 status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
-        source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
-        translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
         if show_original.isChecked():
-            output.append(
-                f'<div style="margin-bottom: 14px;">'
+            entry = (
+                f'<div style="margin-bottom:14px;">'
                 f'<div style="color:{source_color};">{escape(source)}</div>'
-                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">{escape(translated)}</div>'
-                f'</div>'
+                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">'
+                f'{escape(translated)}</div></div>'
             )
         else:
-            output.append(
-                f'<div style="margin-bottom: 14px; font-weight:700; color:{translated_color};">'
+            entry = (
+                f'<div style="margin-bottom:14px; font-weight:700; color:{translated_color};">'
                 f'{escape(translated)}</div>'
             )
+        output_entries.append(entry)
+        render_output()
 
     def stop_session():
         if worker is not None and worker.isRunning():
@@ -543,6 +568,9 @@ def run_gui(application) -> int:
         finish_session()
 
     def clear_output():
+        nonlocal provisional_entry
+        output_entries.clear()
+        provisional_entry = ""
         output.clear()
 
     def change_font_size(value):
