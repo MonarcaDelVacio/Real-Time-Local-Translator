@@ -472,11 +472,10 @@ def run_gui(application) -> int:
     def append_translation(lang, translated, source, is_final):
         nonlocal transcript_path
         if not is_final:
-            # Streaming ASR hypotheses are provisional and are not translated yet.
-            # Show them visibly instead of hiding them in the small status bar.
-            live_preview.setText(f"🎙 Reconocimiento en vivo (provisional): {translated}")
+            # Show the changing translation while streaming ASR revises its hypothesis.
+            live_preview.setText(f"🎙 Traducción en vivo (provisional): {translated}")
             live_preview.setVisible(True)
-            status.setText("●  Reconociendo voz… la traducción aparecerá al terminar la frase")
+            status.setText("●  Traduciendo en vivo… el texto se confirmará al terminar la frase")
             return
 
         live_preview.clear()
