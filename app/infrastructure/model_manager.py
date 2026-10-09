@@ -78,15 +78,15 @@ def _seed_bundled_models(root: Path) -> None:
     source = bundled_models_root()
     if source is None or source.resolve() == root.resolve():
         return
-    for relative, required in (
-        (Path("sherpa") / MODEL, SHERPA_REQUIRED),
-        (Path("whisper") / "small", WHISPER_REQUIRED),
+    for relative, minimum_sizes in (
+        (Path("sherpa") / MODEL, SHERPA_MIN_BYTES),
+        (Path("whisper") / "small", WHISPER_MIN_BYTES),
     ):
         bundled = source / relative
         destination = root / relative
-        if _complete(destination, required):
+        if _assets_complete(destination, minimum_sizes):
             continue
-        if _complete(bundled, required):
+        if _assets_complete(bundled, minimum_sizes):
             if destination.exists():
                 shutil.rmtree(destination, ignore_errors=True)
             destination.parent.mkdir(parents=True, exist_ok=True)
