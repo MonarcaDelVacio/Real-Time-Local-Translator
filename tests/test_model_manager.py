@@ -3,7 +3,7 @@ import tarfile
 
 import pytest
 
-from app.infrastructure.model_manager import _complete, _safe_extract
+from app.infrastructure.model_manager import WHISPER_REQUIRED, _complete, _safe_extract
 
 
 def test_complete_rejects_empty_required_files(tmp_path):
@@ -44,3 +44,12 @@ def test_safe_extract_accepts_regular_file(tmp_path):
     with tarfile.open(fileobj=archive_bytes, mode="r:bz2") as archive:
         _safe_extract(archive, destination)
     assert (destination / "model" / "weights.bin").read_bytes() == b"model-data"
+
+
+def test_official_faster_whisper_small_files_are_sufficient(tmp_path):
+    model = tmp_path / "small"
+    model.mkdir()
+    for name in ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt"):
+        (model / name).write_bytes(b"valid")
+    assert "preprocessor_config.json" not in WHISPER_REQUIRED
+    assert _complete(model, WHISPER_REQUIRED)
