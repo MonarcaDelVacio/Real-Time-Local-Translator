@@ -76,16 +76,12 @@ if errorlevel 1 (
 echo [OK] Runtime imports verified.
 echo.
 
-echo [5/5] Checking local AI models...
-if not exist "models\.ready" (
-    echo [INFO] Local model set is incomplete. Preparing it now...
-    "%VENV_PY%" "scripts\prepare_streaming_models.py"
-    if errorlevel 1 (
-        echo [ERROR] Local AI model preparation failed.
-        goto :FAIL
-    )
-) else (
-    echo [OK] Local model readiness marker found.
+echo [5/5] Verifying local AI models...
+echo Checking every required model file and repairing missing or incomplete assets...
+"%VENV_PY%" "scripts\prepare_streaming_models.py"
+if errorlevel 1 (
+    echo [ERROR] Local AI model verification or repair failed.
+    goto :FAIL
 )
 
 echo.
