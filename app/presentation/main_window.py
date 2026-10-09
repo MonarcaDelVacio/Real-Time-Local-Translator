@@ -43,12 +43,12 @@ def append_conversation_entry(path, source: str, translated: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with target.open("a", encoding="utf-8") as history_file:
-        history_file.write(f"[{timestamp}]\\n")
+        history_file.write(f"[{timestamp}]\n")
         if original:
-            history_file.write(f"Original: {original}\\n")
+            history_file.write(f"Original: {original}\n")
         if result:
-            history_file.write(f"Traducción: {result}\\n")
-        history_file.write("\\n")
+            history_file.write(f"Traducción: {result}\n")
+        history_file.write("\n")
 
 
 def run_gui(application) -> int:
@@ -330,6 +330,7 @@ def run_gui(application) -> int:
         "Las traducciones finales aparecerán aquí automáticamente."
     )
     globals_for_theme["output"] = output
+    globals_for_theme["live_preview"] = live_preview
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
@@ -560,7 +561,7 @@ def run_gui(application) -> int:
                 preview_lines.append(f"Original: {source_text}")
             if translated_text:
                 preview_lines.append(f"Traducción: {translated_text}")
-            live_preview.setText("\\n".join(preview_lines))
+            live_preview.setText("\n".join(preview_lines))
             status.setText("●  Reconociendo y traduciendo; el historial confirmado se conserva abajo…")
             return
 
