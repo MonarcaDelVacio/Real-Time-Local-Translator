@@ -16,7 +16,7 @@ def append_transcript_text(path, text: str) -> None:
         if file_size:
             transcript_file.seek(file_size - 1)
             last_char = transcript_file.read(1)
-            separator = "\\n\\n" if last_char in ".!?…" else " "
+            separator = "\n\n" if last_char in ".!?…" else " "
         transcript_file.seek(0, 2)
         transcript_file.write(separator + clean_text)
 
