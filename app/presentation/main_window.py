@@ -436,6 +436,9 @@ def run_gui(application) -> int:
     worker = None
     transcript_path = None
     history_path = None
+    # Each pane owns one mutable subtitle line at the bottom. New hypotheses
+    # update only that line; prior subtitle lines remain visible and untouched.
+    live_line_cursors = {"original": None, "translation": None}
 
     def transcripts_directory():
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -586,46 +589,74 @@ def run_gui(application) -> int:
 
         source_text = " ".join((source or "").split())
         translated_text = " ".join((translated or "").split())
-        if not is_final:
-            # Mutable hypotheses are shown in separate live panels; they never
-            # enter the permanent transcript or overwrite finalized entries.
-            if show_original.isChecked() and source_text:
-                live_original.setText(f"Original en vivo: {source_text}")
-            if translated_text:
-                live_translation.setText(f"Traducción en vivo: {translated_text}")
-            status.setText("●  Reconociendo y traduciendo; el historial confirmado se conserva…")
-            return
-
         source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
         translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
         border_color = "#26344a" if current_theme["dark"] else "#d5deea"
 
-        def append_entry(widget, html):
+        def set_live_line(widget, key, text):
+            if not text:
+                return
+            scrollbar = widget.verticalScrollBar()
+            follow_new_text = scrollbar.value() >= scrollbar.maximum() - 4
+            cursor = live_line_cursors[key]
+            if cursor is None:
+                cursor = widget.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                if not widget.document().isEmpty():
+                    cursor.insertBlock()
+                cursor.insertText(text)
+            else:
+                cursor = QTextCursor(cursor)
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                cursor.insertText(text)
+            live_line_cursors[key] = QTextCursor(cursor)
+            widget.setTextCursor(cursor)
+            if follow_new_text:
+                scroll_output_to_bottom(widget)
+
+        def finalize_line(widget, key, text, color, bold=False):
+            cursor = live_line_cursors[key]
+            if cursor is not None:
+                cursor = QTextCursor(cursor)
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                final_text = text or cursor.selectedText()
+                cursor.insertText(final_text)
+                live_line_cursors[key] = None
+                widget.setTextCursor(cursor)
+                return
+            if not text:
+                return
+            weight = "font-weight:700;" if bold else ""
+            append_entry_html = (
+                f'<div style="margin-bottom:12px; padding-bottom:10px; '
+                f'border-bottom:1px solid {border_color}; color:{color}; {weight}">'
+                f'{escape(text)}</div>'
+            )
             scrollbar = widget.verticalScrollBar()
             follow_new_text = scrollbar.value() >= scrollbar.maximum() - 4
             cursor = widget.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
-            cursor.insertHtml(html)
+            cursor.insertHtml(append_entry_html)
             cursor.insertBlock()
             widget.setTextCursor(cursor)
             if follow_new_text:
                 scroll_output_to_bottom(widget)
 
-        if source_text:
-            append_entry(
-                original_output,
-                f'<div style="margin-bottom:12px; padding-bottom:10px; '
-                f'border-bottom:1px solid {border_color}; color:{source_color};">'
-                f'{escape(source_text)}</div>',
-            )
+        if not is_final:
+            # Show the latest hypothesis as an editable subtitle line at the
+            # bottom of each language history, without deleting earlier lines.
+            if source_text:
+                if show_original.isChecked():
+                    live_original.setText(f"Original en vivo: {source_text}")
+                set_live_line(original_output, "original", source_text)
+            if translated_text:
+                live_translation.setText(f"Traducción en vivo: {translated_text}")
+                set_live_line(output, "translation", translated_text)
+            status.setText("●  Reconociendo y traduciendo; los subtítulos anteriores se conservan…")
+            return
 
-        if translated_text:
-            append_entry(
-                output,
-                f'<div style="margin-bottom:12px; padding-bottom:10px; '
-                f'border-bottom:1px solid {border_color}; font-weight:700; color:{translated_color};">'
-                f'{escape(translated_text)}</div>',
-            )
+        finalize_line(original_output, "original", source_text, source_color)
+        finalize_line(output, "translation", translated_text, translated_color, bold=True)
 
         try:
             folder = transcripts_directory()
@@ -639,7 +670,7 @@ def run_gui(application) -> int:
 
         live_original.setText("Original en vivo: esperando el siguiente fragmento…")
         live_translation.setText("Traducción en vivo: esperando el siguiente fragmento…")
-        status.setText("●  Fragmento confirmado; historial guardado")
+        status.setText("●  Subtítulo confirmado; historial guardado")
 
     def stop_session():
         if worker is not None and worker.isRunning():
@@ -655,6 +686,8 @@ def run_gui(application) -> int:
         # This clears only the on-screen view. Saved transcript files remain intact.
         output.clear()
         original_output.clear()
+        live_line_cursors["original"] = None
+        live_line_cursors["translation"] = None
 
     def change_font_size(value):
         settings.setValue("font_size", value)
