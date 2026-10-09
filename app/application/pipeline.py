@@ -245,13 +245,11 @@ class TranslationPipeline:
                                     on_error(exc)
                         self._translate_segments(final_segments, on_translation, on_error)
                     elif segment.text.strip():
-                        on_translation(
-                            TranslationSegment(
-                                source=segment,
-                                translated_text=segment.text,
-                                target_language_code=segment.language_code or source_language,
-                                created_at=datetime.now(),
-                            )
+                        # Translate each updated streaming hypothesis immediately.
+                        # The UI treats non-final segments as a replaceable live
+                        # preview, so cumulative hypotheses do not pollute history.
+                        self._translate_segments(
+                            [segment], on_translation, on_error
                         )
 
             stopping = stop_requested() or bool(capture_errors)
