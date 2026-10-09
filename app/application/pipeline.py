@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from datetime import datetime
 
 from app.domain.models import AudioChunk, TranslationSegment, TranscriptSegment
 from app.domain.ports import (
