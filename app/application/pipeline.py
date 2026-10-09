@@ -236,6 +236,10 @@ class TranslationPipeline:
                     engine.start_stream()
                     self._speech.clear()
                     self._stream_audio_truncated = False
+                    # A dropped audio interval invalidates the previous partial
+                    # hypothesis as well as the decoder state.
+                    last_preview_at = 0.0
+                    last_preview_text = ""
 
                 chunk = item
                 segments = list(engine.accept_audio(chunk))

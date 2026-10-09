@@ -148,9 +148,11 @@ class SherpaNemotronStreamingASR(StreamingASREngine):
                         is_final=True,
                     )
                 )
-                self._recognizer.reset(self._stream)
-                self._last_text = ""
-                self._utterance_started_at = 0.0
+            # Always reset at an endpoint, even if the decoder produced no text.
+            # Otherwise a later utterance can inherit stale stream state.
+            self._recognizer.reset(self._stream)
+            self._last_text = ""
+            self._utterance_started_at = 0.0
         return results
 
     def finish_stream(self) -> Iterable[TranscriptSegment]:
