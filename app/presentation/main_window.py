@@ -62,6 +62,7 @@ def run_gui(application) -> int:
 
     class Worker(QThread):
         translated = Signal(str, str, str, bool)
+        transcript = Signal(str)
         status_changed = Signal(str)
         initialization_finished = Signal()
         failed = Signal(str)
@@ -95,6 +96,7 @@ def run_gui(application) -> int:
                     ),
                     self.stop_flag.is_set,
                     self._report_error,
+                    lambda segment: self.transcript.emit(segment.text),
                 )
             except Exception as exc:
                 self.error_message = str(exc)
@@ -468,6 +470,7 @@ def run_gui(application) -> int:
         initialization.setFormat("Inicializando motores locales…")
         status.setText("●  Inicializando motores locales…")
         worker.translated.connect(append_translation)
+        worker.transcript.connect(append_original_transcript)
         worker.status_changed.connect(lambda value: status.setText("●  " + value))
         worker.initialization_finished.connect(lambda: initialization.setVisible(False))
         worker.failed.connect(lambda error: status.setText(f"●  Error: {error}"))
@@ -494,6 +497,20 @@ def run_gui(application) -> int:
         # Follow the newest text automatically, even during a long session.
         scrollbar = output.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+
+    def append_original_transcript(source):
+        nonlocal transcript_path
+        if not source or not source.strip():
+            return
+        try:
+            folder = transcripts_directory()
+            folder.mkdir(parents=True, exist_ok=True)
+            if transcript_path is None:
+                transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
+                transcript_path.write_text("", encoding="utf-8")
+            append_transcript_text(transcript_path, source)
+        except OSError as exc:
+            status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
     def append_translation(lang, translated, source, is_final):
         nonlocal transcript_path, provisional_start, provisional_end
@@ -540,22 +557,6 @@ def run_gui(application) -> int:
             output.setTextCursor(cursor)
             provisional_start = None
             provisional_end = None
-
-        # Persist only finalized original-language text, independently of whether
-        # the user chooses to display the original text in the UI.
-        if source and source.strip():
-            try:
-                folder = transcripts_directory()
-                folder.mkdir(parents=True, exist_ok=True)
-                if transcript_path is None:
-                    transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
-                    transcript_path.write_text("", encoding="utf-8")
-                # Store plain recognized text only, without labels or timestamps.
-                append_transcript_text(transcript_path, source)
-            except OSError as exc:
-                # A disk/permission problem must not discard the translation or
-                # crash the GUI slot; surface the save failure instead.
-                status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
         if show_original.isChecked():
             entry = (

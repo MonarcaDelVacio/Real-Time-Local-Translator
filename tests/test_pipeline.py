@@ -205,3 +205,35 @@ def test_streaming_preview_resets_after_finalized_utterance():
     assert len(provisional) == 2
     assert len(finalized) == 1
     assert all(result.source.text == "hello" for result in provisional)
+
+
+def test_final_transcript_is_reported_even_when_translation_fails():
+    from app.domain.ports import StreamingASREngine
+
+    class FinalStreamingEngine(StreamingASREngine):
+        def start_stream(self):
+            pass
+
+        def accept_audio(self, chunk):
+            return [TranscriptSegment("recognized words", 0, 1, "en", is_final=True)]
+
+        def finish_stream(self):
+            return []
+
+        def transcribe(self, chunks):
+            return []
+
+    class BrokenTranslation(FakeTranslation):
+        def translate(self, segment, target_language_code):
+            raise RuntimeError("translation unavailable")
+
+    source = FakeSource([AudioChunk(b"speech", 16000, 1, 0.0)])
+    pipeline = TranslationPipeline(
+        source, FakeVAD(), FinalStreamingEngine(), BrokenTranslation()
+    )
+    transcripts = []
+    errors = []
+    pipeline.run(lambda _: None, lambda: False, errors.append, transcripts.append)
+
+    assert [segment.text for segment in transcripts] == ["recognized words"]
+    assert any("translation unavailable" in str(error) for error in errors)

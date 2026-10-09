@@ -103,10 +103,17 @@ class TranslationPipeline:
         on_translation: Callable[[TranslationSegment], None],
         on_error: Callable[[Exception], None] | None,
         finals_only: bool = False,
+        on_transcript: Callable[[TranscriptSegment], None] | None = None,
     ) -> None:
         for segment in segments:
             if not segment.text.strip() or (finals_only and not segment.is_final):
                 continue
+            if segment.is_final and on_transcript is not None:
+                try:
+                    on_transcript(segment)
+                except Exception as exc:
+                    if on_error is not None:
+                        on_error(exc)
             try:
                 translated = self.translator.translate(
                     self._resolve_language(segment), self.target_language
@@ -122,13 +129,15 @@ class TranslationPipeline:
         self,
         chunks: list[AudioChunk],
         on_error: Callable[[Exception], None] | None = None,
+        on_transcript: Callable[[TranscriptSegment], None] | None = None,
     ) -> list[TranslationSegment]:
         if not chunks:
             return []
         results: list[TranslationSegment] = []
         try:
             self._translate_segments(
-                self.asr.transcribe(chunks), results.append, on_error
+                self.asr.transcribe(chunks), results.append, on_error,
+                on_transcript=on_transcript,
             )
         except Exception as exc:
             if on_error is not None:
@@ -154,6 +163,7 @@ class TranslationPipeline:
         on_translation: Callable[[TranslationSegment], None],
         stop_requested: Callable[[], bool],
         on_error: Callable[[Exception], None] | None,
+        on_transcript: Callable[[TranscriptSegment], None] | None = None,
     ) -> None:
         import queue
         import threading
@@ -243,7 +253,10 @@ class TranslationPipeline:
                 segments, refinement_error = completed_finals.pop(next_final_to_emit)
                 if refinement_error is not None and on_error is not None:
                     on_error(refinement_error)
-                self._translate_segments(segments, on_translation, on_error, finals_only=True)
+                self._translate_segments(
+                    segments, on_translation, on_error,
+                    finals_only=True, on_transcript=on_transcript,
+                )
                 next_final_to_emit += 1
             # The UI currently owns one provisional entry. Defer later previews
             # until all outstanding refinements are resolved so a late final
@@ -399,12 +412,13 @@ class TranslationPipeline:
         on_translation: Callable[[TranslationSegment], None],
         stop_requested: Callable[[], bool],
         on_error: Callable[[Exception], None] | None = None,
+        on_transcript: Callable[[TranscriptSegment], None] | None = None,
     ) -> None:
         try:
             # Some audio backends may partially initialize a device before raising.
             self.source.start()
             if isinstance(self.asr, StreamingASREngine):
-                self._run_streaming(on_translation, stop_requested, on_error)
+                self._run_streaming(on_translation, stop_requested, on_error, on_transcript)
                 return
 
             while not stop_requested():
@@ -413,10 +427,10 @@ class TranslationPipeline:
                 chunk = self.source.read()
                 ready = self._collect_utterance(chunk)
                 if ready is not None:
-                    for result in self._translate_chunks(ready, on_error):
+                    for result in self._translate_chunks(ready, on_error, on_transcript):
                         on_translation(result)
 
-            for result in self._translate_chunks(self._take_speech(), on_error):
+            for result in self._translate_chunks(self._take_speech(), on_error, on_transcript):
                 on_translation(result)
         finally:
             import sys
