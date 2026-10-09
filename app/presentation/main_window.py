@@ -30,6 +30,27 @@ def append_transcript_text(path, text: str) -> None:
         transcript_file.write(separator + clean_text)
 
 
+def append_conversation_entry(path, source: str, translated: str) -> None:
+    """Persist one finalized source/translation pair without rewriting prior history."""
+    from datetime import datetime
+    from pathlib import Path
+
+    original = " ".join(source.split())
+    result = " ".join(translated.split())
+    if not original and not result:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with target.open("a", encoding="utf-8") as history_file:
+        history_file.write(f"[{timestamp}]\\n")
+        if original:
+            history_file.write(f"Original: {original}\\n")
+        if result:
+            history_file.write(f"Traducción: {result}\\n")
+        history_file.write("\\n")
+
+
 def run_gui(application) -> int:
     import os
     from pathlib import Path
@@ -276,7 +297,7 @@ def run_gui(application) -> int:
     settings_button = QPushButton("⚙  Ajustes")
     start.setToolTip("Comenzar la captura y traducción del audio del sistema")
     stop.setToolTip("Detener la captura")
-    clear.setToolTip("Borrar el historial visible")
+    clear.setToolTip("Borrar solo el historial visible; los archivos guardados no se eliminan")
     settings_button.setToolTip("Configurar idioma, apariencia y opciones de visualización")
     row.addWidget(start)
     row.addWidget(stop)
@@ -290,9 +311,10 @@ def run_gui(application) -> int:
     initialization.setVisible(False)
     initialization.setMinimumHeight(22)
 
-    live_preview = QLabel("")
+    live_preview = QLabel("En vivo: esperando audio…")
     live_preview.setWordWrap(True)
-    live_preview.setVisible(False)
+    live_preview.setMinimumHeight(52)
+    live_preview.setVisible(True)
     live_preview.setStyleSheet(
         "QLabel { background: #17243a; color: #bfdbfe; border: 1px solid #2b4264; "
         "border-radius: 8px; padding: 10px 12px; font-weight: 600; }"
@@ -301,9 +323,8 @@ def run_gui(application) -> int:
     output = QTextEdit()
     output.setReadOnly(True)
     output.setAcceptRichText(True)
-    # Bound the rendered session history so long meetings cannot grow the GUI
-    # document indefinitely. The original transcript is persisted separately.
-    output.document().setMaximumBlockCount(3000)
+    # Keep finalized session history in the visible document; it is also saved
+    # to a separate UTF-8 file so the user can review it after the session.
     output.setPlaceholderText(
         "Cuando estés listo, pulsa «Iniciar» y reproduce una voz por los altavoces o auriculares de Windows.\n\n"
         "Las traducciones finales aparecerán aquí automáticamente."
@@ -314,6 +335,7 @@ def run_gui(application) -> int:
     layout.addWidget(statusbar)
     layout.addWidget(initialization)
     layout.addWidget(toolbar)
+    layout.addWidget(live_preview)
     layout.addWidget(output, 1)
     window.setCentralWidget(central)
 
@@ -380,10 +402,7 @@ def run_gui(application) -> int:
 
     worker = None
     transcript_path = None
-    # Track the temporary live entry inside the document so revisions replace it
-    # in place without rebuilding the entire history on every update.
-    provisional_start = None
-    provisional_end = None
+    history_path = None
 
     def transcripts_directory():
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -474,11 +493,13 @@ def run_gui(application) -> int:
         theme_combo.setEnabled(True)
 
     def start_session():
-        nonlocal worker, transcript_path
+        nonlocal worker, transcript_path, history_path
         if worker is not None and worker.isRunning():
             return
         save_preferences()
         transcript_path = None
+        history_path = None
+        live_preview.setText("En vivo: esperando audio…")
         worker = Worker(application, target.currentData())
         initialization.setVisible(True)
         initialization.setFormat("Inicializando motores locales…")
@@ -508,7 +529,6 @@ def run_gui(application) -> int:
         theme_combo.setEnabled(False)
 
     def scroll_output_to_bottom():
-        # Follow the newest text automatically, even during a long session.
         scrollbar = output.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
@@ -527,69 +547,63 @@ def run_gui(application) -> int:
             status.setText(f"●  No se pudo guardar la transcripción: {exc}")
 
     def append_translation(lang, translated, source, is_final):
-        nonlocal provisional_start, provisional_end
+        nonlocal history_path
         from html import escape
 
-        source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
-        translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
-        source_html = (
-            f'<div style="color:{source_color};">{escape(source)}</div>'
-            if show_original.isChecked() and source and source.strip()
-            else ""
-        )
+        source_text = " ".join((source or "").split())
+        translated_text = " ".join((translated or "").split())
         if not is_final:
-            # Update one provisional entry in place as the ASR revises its hypothesis.
-            live_entry = (
-                f'<div style="margin-bottom:14px; padding:8px; '
-                f'border-left:3px solid #3b82f6;">'
-                f'{source_html}'
-                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">'
-                f'{escape(translated)}</div>'
-                f'<div style="margin-top:3px; color:{source_color}; font-size:11px;">En vivo · provisional</div>'
-                f'</div>'
-            )
-            cursor = output.textCursor()
-            if provisional_start is None or provisional_end is None:
-                cursor.movePosition(QTextCursor.MoveOperation.End)
-                provisional_start = QTextCursor(cursor)
-                provisional_start.setKeepPositionOnInsert(True)
-            else:
-                cursor.setPosition(provisional_start.position())
-                cursor.setPosition(provisional_end.position(), QTextCursor.MoveMode.KeepAnchor)
-            cursor.insertHtml(live_entry)
-            provisional_end = QTextCursor(cursor)
-            output.setTextCursor(cursor)
-            scroll_output_to_bottom()
-            status.setText("●  Transcribiendo y traduciendo en vivo…")
+            # Mutable recognition hypotheses live only in this separate panel.
+            # They never enter or replace any part of the finalized history.
+            preview_lines = ["EN VIVO · provisional"]
+            if show_original.isChecked() and source_text:
+                preview_lines.append(f"Original: {source_text}")
+            if translated_text:
+                preview_lines.append(f"Traducción: {translated_text}")
+            live_preview.setText("\\n".join(preview_lines))
+            status.setText("●  Reconociendo y traduciendo; el historial confirmado se conserva abajo…")
             return
 
-        # Remove the temporary live entry before inserting the finalized phrase.
-        if provisional_start is not None and provisional_end is not None:
-            cursor = output.textCursor()
-            cursor.setPosition(provisional_start.position())
-            cursor.setPosition(provisional_end.position(), QTextCursor.MoveMode.KeepAnchor)
-            cursor.removeSelectedText()
-            output.setTextCursor(cursor)
-            provisional_start = None
-            provisional_end = None
-
-        if show_original.isChecked():
+        # Every final result is append-only in the UI and on disk. Do not remove
+        # prior entries when the ASR revises its live hypothesis.
+        source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
+        translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
+        if show_original.isChecked() and source_text:
             entry = (
-                f'<div style="margin-bottom:14px;">'
-                f'<div style="color:{source_color};">{escape(source)}</div>'
-                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">'
-                f'{escape(translated)}</div></div>'
+                f'<div style="margin-bottom:18px; padding-bottom:12px; '
+                f'border-bottom:1px solid {"#26344a" if current_theme["dark"] else "#d5deea"};">'
+                f'<div style="color:{source_color};">{escape(source_text)}</div>'
+                f'<div style="margin-top:5px; font-weight:700; color:{translated_color};">'
+                f'{escape(translated_text)}</div></div>'
             )
         else:
             entry = (
-                f'<div style="margin-bottom:14px; font-weight:700; color:{translated_color};">'
-                f'{escape(translated)}</div>'
+                f'<div style="margin-bottom:18px; padding-bottom:12px; '
+                f'border-bottom:1px solid {"#26344a" if current_theme["dark"] else "#d5deea"}; '
+                f'font-weight:700; color:{translated_color};">{escape(translated_text)}</div>'
             )
+
+        scrollbar = output.verticalScrollBar()
+        follow_new_text = scrollbar.value() >= scrollbar.maximum() - 4
         cursor = output.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertHtml(entry)
         output.setTextCursor(cursor)
-        scroll_output_to_bottom()
+        if follow_new_text:
+            scroll_output_to_bottom()
+
+        try:
+            folder = transcripts_directory()
+            folder.mkdir(parents=True, exist_ok=True)
+            if history_path is None:
+                history_path = folder / f"Historial_traduccion_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
+                history_path.write_text("", encoding="utf-8")
+            append_conversation_entry(history_path, source_text, translated_text)
+        except OSError as exc:
+            status.setText(f"●  No se pudo guardar el historial de traducción: {exc}")
+
+        live_preview.setText("En vivo: esperando el siguiente fragmento…")
+        status.setText("●  Fragmento confirmado; historial guardado")
 
     def stop_session():
         if worker is not None and worker.isRunning():
@@ -602,10 +616,8 @@ def run_gui(application) -> int:
         finish_session()
 
     def clear_output():
-        nonlocal provisional_start, provisional_end
+        # This clears only the on-screen view. Saved transcript files remain intact.
         output.clear()
-        provisional_start = None
-        provisional_end = None
 
     def change_font_size(value):
         settings.setValue("font_size", value)
