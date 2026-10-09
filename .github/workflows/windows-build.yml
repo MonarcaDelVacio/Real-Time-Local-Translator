@@ -45,6 +45,19 @@ jobs:
           New-Item -ItemType Directory -Force redist | Out-Null
           Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "redist\\vc_redist.x64.exe"
 
+      - name: Verify Microsoft Visual C++ runtime signature
+        shell: pwsh
+        run: |
+          $runtime = Join-Path $env:GITHUB_WORKSPACE "redist\\vc_redist.x64.exe"
+          $signature = Get-AuthenticodeSignature -LiteralPath $runtime
+          if ($signature.Status -ne "Valid") {
+            throw "Microsoft Visual C++ runtime signature is not valid: $($signature.Status)"
+          }
+          if ($signature.SignerCertificate.Subject -notlike "*Microsoft Corporation*") {
+            throw "Unexpected signer for Microsoft Visual C++ runtime: $($signature.SignerCertificate.Subject)"
+          }
+          Write-Host "Verified Microsoft-signed Visual C++ runtime."
+
       - name: Build installer
         shell: pwsh
         run: |

@@ -69,29 +69,26 @@ Si la preparación inicial falla, la aplicación muestra un cuadro de error con 
 
 ## Estado
 
-- [x] Arquitectura por capas
-- [x] Captura Windows WASAPI loopback
-- [x] VAD local básico
-- [x] faster-whisper local
-- [x] Detección automática de idioma mediante Whisper
-- [x] Argos Translate local
-- [x] Paquetes Argos portables
-- [x] Segmentación por silencio
-- [x] Límite de duración/buffer
-- [x] Errores aislados por segmento
-- [x] Inicialización de motores fuera del hilo GUI
-- [x] Build PyInstaller reproducible
-- [x] Instalador Inno Setup
-- [x] Build automatizado de Windows
-- [ ] Validación real de WASAPI en hardware Windows
-- [ ] Medición de latencia y rendimiento
-- [ ] VAD neuronal
-- [ ] Historial de sesiones
-- [ ] Selector avanzado de dispositivo
-- [ ] Ampliación de idiomas
-- [ ] Firma digital
+El proyecto sigue siendo experimental. El CI valida pruebas automatizadas y empaquetado, pero no sustituye las pruebas reales de audio y rendimiento en Windows.
 
-**Importante:** la Preview está preparada para la primera prueba de hardware, pero no se considera versión final hasta comprobar captura, ASR, traducción y estabilidad en Windows real.
+- [x] Captura del audio del sistema mediante WASAPI Loopback.
+- [x] Transcripción provisional en vivo con Nemotron/Sherpa-ONNX.
+- [x] Refinamiento de frases finalizadas con Whisper Small.
+- [x] Traducción local Inglés ↔ Español mediante Argos.
+- [x] Preparación y comprobación de modelos al iniciar.
+- [x] Reparación de configuraciones Whisper inválidas y paquetes Argos no utilizables.
+- [x] Refinamiento Whisper desacoplado del consumidor de audio.
+- [x] Historial visual acotado y transcripción original guardada por separado.
+- [x] SHA-256 generado para el instalador de cada compilación.
+- [ ] Validación de extremo a extremo en equipos Windows reales.
+- [ ] Pruebas de estrés prolongadas para cuantificar pérdida de audio y latencia.
+- [ ] Bloqueo completo de versiones de dependencias para builds reproducibles.
+- [ ] Firma digital del instalador.
+- [ ] Centralizar todos los modelos en activos propios de GitHub Releases.
+
+### Procedencia de los recursos
+
+En el flujo actual, el modelo Nemotron/Sherpa se obtiene desde GitHub Releases, Whisper Small desde Hugging Face y los paquetes Argos desde su índice de paquetes. La preparación inicial necesita Internet; el procesamiento de audio y la traducción posteriores se realizan localmente.
 
 ## Privacidad
 
