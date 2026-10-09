@@ -80,3 +80,21 @@ def test_pipeline_reports_segment_error_and_keeps_running():
     )
     assert len(errors) == 1
     assert "translation unavailable" in str(errors[0])
+
+def test_pipeline_stops_source_when_read_fails():
+    import pytest
+
+    class FailingSource(FakeSource):
+        stopped = False
+
+        def read(self):
+            raise RuntimeError("audio device failed")
+
+        def stop(self):
+            self.stopped = True
+
+    source = FailingSource([])
+    p = TranslationPipeline(source, FakeVAD(), FakeASR(), FakeTranslation())
+    with pytest.raises(RuntimeError, match="audio device failed"):
+        p.run(lambda _: None, lambda: False)
+    assert source.stopped
