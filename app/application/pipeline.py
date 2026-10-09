@@ -255,7 +255,19 @@ class TranslationPipeline:
             for result in self._translate_chunks(self._take_speech(), on_error):
                 on_translation(result)
         finally:
-            self.source.stop()
-            self._speech.clear()
-            self._silence = 0
-            self._stream_audio_truncated = False
+            import sys
+
+            active_error = sys.exc_info()[0] is not None
+            try:
+                self.source.stop()
+            except Exception as stop_error:
+                # Do not mask the original capture/recognition error with a
+                # secondary device-cleanup failure.
+                if on_error is not None:
+                    on_error(stop_error)
+                elif not active_error:
+                    raise
+            finally:
+                self._speech.clear()
+                self._silence = 0
+                self._stream_audio_truncated = False
