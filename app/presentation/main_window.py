@@ -26,7 +26,7 @@ def run_gui(application) -> int:
     from pathlib import Path
     from datetime import datetime
     from PySide6.QtCore import QThread, Signal, QSettings, Qt, QUrl
-    from PySide6.QtGui import QPalette, QDesktopServices
+    from PySide6.QtGui import QPalette, QDesktopServices, QTextCursor
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
@@ -364,10 +364,10 @@ def run_gui(application) -> int:
 
     worker = None
     transcript_path = None
-    # Keep finalized entries separate from the changing provisional sentence,
-    # so every ASR revision updates in place instead of duplicating lines.
-    output_entries: list[str] = []
-    provisional_entry = ""
+    # Track the temporary live entry inside the document so revisions replace it
+    # in place without rebuilding the entire history on every update.
+    provisional_start = None
+    provisional_end = None
 
     def transcripts_directory():
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -490,14 +490,13 @@ def run_gui(application) -> int:
         always_on_top_box.setEnabled(False)
         theme_combo.setEnabled(False)
 
-    def render_output():
-        output.setHtml("".join(output_entries) + provisional_entry)
-        # Keep the newest text visible as it arrives, without requiring manual scrolling.
+    def scroll_output_to_bottom():
+        # Follow the newest text automatically, even during a long session.
         scrollbar = output.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
     def append_translation(lang, translated, source, is_final):
-        nonlocal transcript_path, provisional_entry
+        nonlocal transcript_path, provisional_start, provisional_end
         from html import escape
 
         source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
@@ -508,9 +507,8 @@ def run_gui(application) -> int:
             else ""
         )
         if not is_final:
-            # Render the evolving ASR/translation hypothesis at the end of the
-            # main history. Revisions replace this block instead of adding duplicates.
-            provisional_entry = (
+            # Update one provisional entry in place as the ASR revises its hypothesis.
+            live_entry = (
                 f'<div style="margin-bottom:14px; padding:8px; '
                 f'border-left:3px solid #3b82f6;">'
                 f'{source_html}'
@@ -519,12 +517,29 @@ def run_gui(application) -> int:
                 f'<div style="margin-top:3px; color:{source_color}; font-size:11px;">En vivo · provisional</div>'
                 f'</div>'
             )
-            render_output()
+            cursor = output.textCursor()
+            if provisional_start is None or provisional_end is None:
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                provisional_start = cursor.position()
+            else:
+                cursor.setPosition(provisional_start)
+                cursor.setPosition(provisional_end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertHtml(live_entry)
+            provisional_end = cursor.position()
+            output.setTextCursor(cursor)
+            scroll_output_to_bottom()
             status.setText("●  Transcribiendo y traduciendo en vivo…")
             return
 
-        # A final result replaces the provisional block with one stable entry.
-        provisional_entry = ""
+        # Remove the temporary live entry before inserting the finalized phrase.
+        if provisional_start is not None and provisional_end is not None:
+            cursor = output.textCursor()
+            cursor.setPosition(provisional_start)
+            cursor.setPosition(provisional_end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            output.setTextCursor(cursor)
+            provisional_start = None
+            provisional_end = None
 
         # Persist only finalized original-language text, independently of whether
         # the user chooses to display the original text in the UI.
@@ -554,8 +569,11 @@ def run_gui(application) -> int:
                 f'<div style="margin-bottom:14px; font-weight:700; color:{translated_color};">'
                 f'{escape(translated)}</div>'
             )
-        output_entries.append(entry)
-        render_output()
+        cursor = output.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertHtml(entry)
+        output.setTextCursor(cursor)
+        scroll_output_to_bottom()
 
     def stop_session():
         if worker is not None and worker.isRunning():
@@ -568,10 +586,10 @@ def run_gui(application) -> int:
         finish_session()
 
     def clear_output():
-        nonlocal provisional_entry
-        output_entries.clear()
-        provisional_entry = ""
+        nonlocal provisional_start, provisional_end
         output.clear()
+        provisional_start = None
+        provisional_end = None
 
     def change_font_size(value):
         settings.setValue("font_size", value)
