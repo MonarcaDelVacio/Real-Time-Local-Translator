@@ -51,7 +51,7 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     members = archive.getmembers()
     for member in members:
         member_path = PurePosixPath(member.name)
-        if member_path.is_absolute() or ".." in member_path.parts:
+        if member_path.is_absolute() or ".." in member_path.parts or "\\\\" in member.name or (member_path.parts and ":" in member_path.parts[0]):
             raise RuntimeError(f"Archivo de modelo contiene una ruta insegura: {member.name}")
         if member.issym() or member.islnk() or member.isdev() or member.isfifo():
             raise RuntimeError(f"Archivo de modelo contiene un tipo de entrada no permitido: {member.name}")
