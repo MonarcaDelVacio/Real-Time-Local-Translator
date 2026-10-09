@@ -261,8 +261,6 @@ def run_gui(application) -> int:
     )
     globals_for_theme["output"] = output
     globals_for_theme["live_preview"] = live_preview
-    # Theme application also sets explicit QTextEdit colors to keep rich text legible.
-    apply_theme(str(settings.value("theme", "Oscuro")))
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
@@ -319,6 +317,10 @@ def run_gui(application) -> int:
     theme_combo.setToolTip("Usar tema claro, oscuro o seguir el tema del sistema operativo")
     theme_row.addWidget(theme_combo, 1)
     settings_layout.addLayout(theme_row)
+
+    globals_for_theme["font_size"] = font_size
+    # Apply explicit QTextEdit colors after all theme controls have been created.
+    apply_theme(theme_combo.currentText())
 
     open_transcripts = QPushButton("Abrir carpeta de transcripciones")
     open_transcripts.setToolTip("Abrir en el Explorador de Windows los archivos originales guardados")
