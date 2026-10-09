@@ -175,7 +175,8 @@ def run_gui(application) -> int:
                 f"background: {'#17243a' if dark else '#dbeafe'}; "
                 f"color: {'#bfdbfe' if dark else '#1e40af'}; "
                 f"border: 1px solid {'#2b4264' if dark else '#93c5fd'}; "
-                "border-radius: 8px; padding: 10px 12px; font-weight: 600; }"
+                "border-radius: 8px; padding: 10px 12px; "
+                f"font-size: {globals_for_theme['font_size'].value()}px; font-weight: 600; }}"
             )
 
     globals_for_theme = {}
@@ -465,7 +466,7 @@ def run_gui(application) -> int:
         start.setEnabled(False)
         stop.setEnabled(True)
         target.setEnabled(False)
-        font_size.setEnabled(False)
+        # Keep font-size adjustable while translation is running.
         always_on_top_box.setEnabled(False)
         theme_combo.setEnabled(False)
 
