@@ -55,6 +55,11 @@ def run_gui(application) -> int:
             self.target_language = target_language
             self.stop_flag = threading.Event()
             self.error_message = None
+            self.last_reported_error = None
+
+        def _report_error(self, error):
+            self.last_reported_error = str(error)
+            self.failed.emit(self.last_reported_error)
 
         def run(self):
             try:
@@ -71,7 +76,7 @@ def run_gui(application) -> int:
                         x.source.is_final,
                     ),
                     self.stop_flag.is_set,
-                    lambda e: self.failed.emit(str(e)),
+                    self._report_error,
                 )
             except Exception as exc:
                 self.error_message = str(exc)
@@ -449,7 +454,9 @@ def run_gui(application) -> int:
             finish_session()
             if worker is not None and worker.error_message:
                 status.setText(f"●  Error: {worker.error_message}")
-                show_error_dialog("No se pudo iniciar", worker.error_message)
+                show_error_dialog("No se pudo iniciar o continuar", worker.error_message)
+            elif worker is not None and worker.last_reported_error:
+                status.setText(f"●  Error durante la captura: {worker.last_reported_error}")
             else:
                 status.setText("●  Detenido")
 
