@@ -103,7 +103,7 @@ def run_gui(application) -> int:
         QPushButton#primary:hover { background: #1d4ed8; }
         QPushButton#danger { background: #3b2430; }
         QCheckBox { color: #cbd5e1; spacing: 7px; }
-        QPlainTextEdit {
+        QPlainTextEdit, QTextEdit {
             background: #0b1220; color: #e5edf7; border: 1px solid #26344a;
             border-radius: 10px; padding: 12px;
             selection-background-color: #2563eb;
@@ -220,7 +220,11 @@ def run_gui(application) -> int:
         "Cuando estés listo, pulsa «Iniciar» y reproduce una voz por los altavoces o auriculares de Windows.\n\n"
         "Las traducciones finales aparecerán aquí automáticamente."
     )
-    output.setStyleSheet(f"font-size: {font_size.value()}px;")
+    output.setStyleSheet(
+        f"background-color: #0b1220; color: #e5edf7; font-size: {font_size.value()}px; "
+        "border: 1px solid #26344a; border-radius: 10px; padding: 12px; "
+        "selection-background-color: #2563eb;"
+    )
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
