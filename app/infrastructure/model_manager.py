@@ -62,28 +62,40 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
 
 
 def _download_archive(url: str, destination: Path, status) -> None:
-    temporary = destination.with_suffix(destination.suffix + ".part")
-    temporary.unlink(missing_ok=True)
-    try:
-        status("Descargando modelo ASR streaming desde GitHub (Sherpa-ONNX)…")
-        with urllib.request.urlopen(url, timeout=60) as response, temporary.open("wb") as out:
-            total = int(response.headers.get("Content-Length", "0") or "0")
-            downloaded = 0
-            while True:
-                block = response.read(1024 * 1024)
-                if not block:
-                    break
-                out.write(block)
-                downloaded += len(block)
-                if total > 0:
-                    status(f"Descargando modelo Sherpa-ONNX… {downloaded * 100 // total}%")
-        if not temporary.is_file() or temporary.stat().st_size < 50_000_000:
-            raise RuntimeError("La descarga del modelo Sherpa-ONNX está incompleta o es demasiado pequeña.")
-        temporary.replace(destination)
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        raise
+    import time
 
+    temporary = destination.with_suffix(destination.suffix + ".part")
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        temporary.unlink(missing_ok=True)
+        try:
+            status(f"Descargando modelo ASR streaming desde GitHub (intento {attempt}/3)…")
+            with urllib.request.urlopen(url, timeout=60) as response, temporary.open("wb") as out:
+                total = int(response.headers.get("Content-Length", "0") or "0")
+                downloaded = 0
+                while True:
+                    block = response.read(1024 * 1024)
+                    if not block:
+                        break
+                    out.write(block)
+                    downloaded += len(block)
+                    if total > 0:
+                        status(f"Descargando modelo Sherpa-ONNX… {downloaded * 100 // total}%")
+            if total > 0 and downloaded != total:
+                raise RuntimeError(
+                    f"Descarga incompleta del modelo Sherpa-ONNX: {downloaded} de {total} bytes."
+                )
+            if not temporary.is_file() or temporary.stat().st_size < 50_000_000:
+                raise RuntimeError("La descarga del modelo Sherpa-ONNX está incompleta o es demasiado pequeña.")
+            temporary.replace(destination)
+            return
+        except Exception as exc:
+            last_error = exc
+            temporary.unlink(missing_ok=True)
+            if attempt < 3:
+                status(f"La descarga falló; se volverá a intentar ({attempt}/3).")
+                time.sleep(2 * attempt)
+    raise RuntimeError(f"No se pudo descargar el modelo Sherpa-ONNX tras 3 intentos: {last_error}") from last_error
 
 def _download_sherpa(destination: Path, status) -> None:
     root = destination.parent
