@@ -4,8 +4,11 @@ import threading
 
 
 def run_gui(application) -> int:
-    from PySide6.QtCore import QThread, Signal, QSettings, Qt
-    from PySide6.QtGui import QFont
+    import os
+    from pathlib import Path
+    from datetime import datetime
+    from PySide6.QtCore import QThread, Signal, QSettings, Qt, QUrl
+    from PySide6.QtGui import QFont, QPalette, QDesktopServices
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
@@ -82,38 +85,96 @@ def run_gui(application) -> int:
     app = QApplication.instance() or QApplication([])
     settings = QSettings("MonarcaDelVacio", "RealTimeLocalTranslator")
 
-    # A compact dark theme keeps the application readable during calls and media playback.
-    app.setStyleSheet("""
-        QWidget { font-size: 13px; }
-        QMainWindow { background: #111827; }
-        QLabel { color: #dbe4f0; }
-        QFrame#header, QFrame#toolbar, QFrame#statusbar {
-            background: #182235; border: 1px solid #26344a; border-radius: 10px;
-        }
-        QLabel#appTitle { font-size: 24px; font-weight: 700; color: #f8fafc; }
-        QLabel#subtitle { color: #94a3b8; }
-        QLabel#status { color: #93c5fd; font-weight: 600; }
-        QComboBox, QSpinBox, QPushButton {
-            background: #202c40; color: #e5edf7; border: 1px solid #35445b;
-            border-radius: 7px; padding: 7px 10px; min-height: 18px;
-        }
-        QComboBox:hover, QSpinBox:hover, QPushButton:hover { border-color: #60a5fa; }
-        QPushButton { font-weight: 600; }
-        QPushButton#primary { background: #2563eb; border-color: #3b82f6; }
-        QPushButton#primary:hover { background: #1d4ed8; }
-        QPushButton#danger { background: #3b2430; }
-        QCheckBox { color: #cbd5e1; spacing: 7px; }
-        QPlainTextEdit, QTextEdit {
-            background: #0b1220; color: #e5edf7; border: 1px solid #26344a;
-            border-radius: 10px; padding: 12px;
-            selection-background-color: #2563eb;
-        }
-        QProgressBar {
-            background: #202c40; border: 1px solid #35445b; border-radius: 7px;
-            text-align: center; color: #e5edf7; min-height: 22px;
-        }
-        QProgressBar::chunk { background: #2563eb; border-radius: 6px; }
-    """)
+    # Resolve "Sistema" against the native palette before applying our own stylesheet.
+    system_palette_dark = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    current_theme = {"dark": True}
+
+    def stylesheet_for(dark):
+        if dark:
+            return """
+                QWidget { font-size: 13px; }
+                QMainWindow, QDialog { background: #111827; }
+                QLabel { color: #dbe4f0; }
+                QFrame#header, QFrame#toolbar, QFrame#statusbar {
+                    background: #182235; border: 1px solid #26344a; border-radius: 10px;
+                }
+                QLabel#appTitle { font-size: 24px; font-weight: 700; color: #f8fafc; }
+                QLabel#subtitle { color: #94a3b8; }
+                QLabel#status { color: #93c5fd; font-weight: 600; }
+                QComboBox, QSpinBox, QPushButton {
+                    background: #202c40; color: #e5edf7; border: 1px solid #35445b;
+                    border-radius: 7px; padding: 7px 10px; min-height: 18px;
+                }
+                QComboBox:hover, QSpinBox:hover, QPushButton:hover { border-color: #60a5fa; }
+                QPushButton { font-weight: 600; }
+                QPushButton#primary { background: #2563eb; border-color: #3b82f6; }
+                QPushButton#primary:hover { background: #1d4ed8; }
+                QPushButton#danger { background: #3b2430; }
+                QCheckBox { color: #cbd5e1; spacing: 7px; }
+                QPlainTextEdit, QTextEdit {
+                    background: #0b1220; color: #e5edf7; border: 1px solid #26344a;
+                    border-radius: 10px; padding: 12px; selection-background-color: #2563eb;
+                }
+                QProgressBar {
+                    background: #202c40; border: 1px solid #35445b; border-radius: 7px;
+                    text-align: center; color: #e5edf7; min-height: 22px;
+                }
+                QProgressBar::chunk { background: #2563eb; border-radius: 6px; }
+            """
+        return """
+            QWidget { font-size: 13px; }
+            QMainWindow, QDialog { background: #f3f6fb; }
+            QLabel { color: #1e293b; }
+            QFrame#header, QFrame#toolbar, QFrame#statusbar {
+                background: #ffffff; border: 1px solid #d5deea; border-radius: 10px;
+            }
+            QLabel#appTitle { font-size: 24px; font-weight: 700; color: #0f172a; }
+            QLabel#subtitle { color: #64748b; }
+            QLabel#status { color: #1d4ed8; font-weight: 600; }
+            QComboBox, QSpinBox, QPushButton {
+                background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1;
+                border-radius: 7px; padding: 7px 10px; min-height: 18px;
+            }
+            QComboBox:hover, QSpinBox:hover, QPushButton:hover { border-color: #3b82f6; }
+            QPushButton { font-weight: 600; }
+            QPushButton#primary { background: #2563eb; color: #ffffff; border-color: #3b82f6; }
+            QPushButton#primary:hover { background: #1d4ed8; }
+            QPushButton#danger { background: #fee2e2; color: #991b1b; }
+            QCheckBox { color: #334155; spacing: 7px; }
+            QPlainTextEdit, QTextEdit {
+                background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1;
+                border-radius: 10px; padding: 12px; selection-background-color: #bfdbfe;
+            }
+            QProgressBar {
+                background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 7px;
+                text-align: center; color: #1e293b; min-height: 22px;
+            }
+            QProgressBar::chunk { background: #2563eb; border-radius: 6px; }
+        """
+
+    def apply_theme(theme_name):
+        dark = system_palette_dark if theme_name == "Sistema" else theme_name == "Oscuro"
+        current_theme["dark"] = dark
+        app.setStyleSheet(stylesheet_for(dark))
+        if "output" in globals_for_theme:
+            globals_for_theme["output"].setStyleSheet(
+                f"background-color: {'#0b1220' if dark else '#ffffff'}; "
+                f"color: {'#e5edf7' if dark else '#0f172a'}; "
+                f"font-size: {globals_for_theme['font_size'].value()}px; "
+                f"border: 1px solid {'#26344a' if dark else '#cbd5e1'}; "
+                "border-radius: 10px; padding: 12px; selection-background-color: #2563eb;"
+            )
+        if "live_preview" in globals_for_theme:
+            globals_for_theme["live_preview"].setStyleSheet(
+                "QLabel { "
+                f"background: {'#17243a' if dark else '#dbeafe'}; "
+                f"color: {'#bfdbfe' if dark else '#1e40af'}; "
+                f"border: 1px solid {'#2b4264' if dark else '#93c5fd'}; "
+                "border-radius: 8px; padding: 10px 12px; font-weight: 600; }"
+            )
+
+    globals_for_theme = {}
+    apply_theme(str(settings.value("theme", "Oscuro")))
 
     window = QMainWindow()
     window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.2")
@@ -159,31 +220,6 @@ def run_gui(application) -> int:
     row.setContentsMargins(12, 9, 12, 9)
     row.setSpacing(9)
 
-    row.addWidget(QLabel("Destino"))
-    target = QComboBox()
-    target.addItem("🇪🇸  Español", "es")
-    target.addItem("🇬🇧  English", "en")
-    target.setCurrentIndex(0 if settings.value("target", "es") == "es" else 1)
-    target.setToolTip("Idioma al que se traducirá el audio")
-    row.addWidget(target)
-
-    show_original = QCheckBox("Original")
-    show_original.setChecked(settings.value("show_original", True, type=bool))
-    show_original.setToolTip("Mostrar también el texto reconocido antes de la traducción")
-    row.addWidget(show_original)
-
-    row.addWidget(QLabel("Texto"))
-    font_size = QSpinBox()
-    font_size.setRange(10, 32)
-    font_size.setValue(settings.value("font_size", 14, type=int))
-    font_size.setSuffix(" px")
-    font_size.setToolTip("Tamaño de letra de la transcripción y traducción")
-    row.addWidget(font_size)
-
-    always_on_top_box = QCheckBox("Siempre encima")
-    always_on_top_box.setChecked(always_on_top)
-    always_on_top_box.setToolTip("Mantener la ventana sobre las demás ventanas")
-    row.addWidget(always_on_top_box)
     row.addStretch()
 
     start = QPushButton("▶  Iniciar")
@@ -191,12 +227,15 @@ def run_gui(application) -> int:
     stop = QPushButton("■  Detener")
     stop.setObjectName("danger")
     clear = QPushButton("Limpiar")
+    settings_button = QPushButton("⚙  Ajustes")
     start.setToolTip("Comenzar la captura y traducción del audio del sistema")
     stop.setToolTip("Detener la captura")
     clear.setToolTip("Borrar el historial visible")
+    settings_button.setToolTip("Configurar idioma, apariencia y opciones de visualización")
     row.addWidget(start)
     row.addWidget(stop)
     row.addWidget(clear)
+    row.addWidget(settings_button)
 
     initialization = QProgressBar()
     initialization.setRange(0, 0)
@@ -220,11 +259,10 @@ def run_gui(application) -> int:
         "Cuando estés listo, pulsa «Iniciar» y reproduce una voz por los altavoces o auriculares de Windows.\n\n"
         "Las traducciones finales aparecerán aquí automáticamente."
     )
-    output.setStyleSheet(
-        f"background-color: #0b1220; color: #e5edf7; font-size: {font_size.value()}px; "
-        "border: 1px solid #26344a; border-radius: 10px; padding: 12px; "
-        "selection-background-color: #2563eb;"
-    )
+    globals_for_theme["output"] = output
+    globals_for_theme["live_preview"] = live_preview
+    # Theme application also sets explicit QTextEdit colors to keep rich text legible.
+    apply_theme(str(settings.value("theme", "Oscuro")))
 
     layout.addWidget(header)
     layout.addWidget(statusbar)
@@ -234,7 +272,84 @@ def run_gui(application) -> int:
     layout.addWidget(output, 1)
     window.setCentralWidget(central)
 
+    # Keep advanced controls together in a dedicated settings dialog.
+    settings_dialog = QDialog(window)
+    settings_dialog.setWindowTitle("Ajustes")
+    settings_dialog.setModal(False)
+    settings_dialog.resize(470, 390)
+    settings_layout = QVBoxLayout(settings_dialog)
+    settings_layout.setContentsMargins(22, 20, 22, 20)
+    settings_layout.setSpacing(14)
+
+    target_label = QLabel("Idioma de destino")
+    target = QComboBox()
+    target.addItem("🇪🇸  Español", "es")
+    target.addItem("🇬🇧  English", "en")
+    target.setCurrentIndex(0 if settings.value("target", "es") == "es" else 1)
+    target.setToolTip("Idioma al que se traducirá el audio")
+    settings_layout.addWidget(target_label)
+    settings_layout.addWidget(target)
+
+    show_original = QCheckBox("Mostrar también la transcripción original")
+    show_original.setChecked(settings.value("show_original", True, type=bool))
+    show_original.setToolTip("Mostrar el texto reconocido antes de la traducción")
+    settings_layout.addWidget(show_original)
+
+    font_row = QHBoxLayout()
+    font_row.addWidget(QLabel("Tamaño del texto"))
+    font_size = QSpinBox()
+    font_size.setRange(10, 32)
+    font_size.setValue(settings.value("font_size", 14, type=int))
+    font_size.setSuffix(" px")
+    font_size.setToolTip("Tamaño de letra de la transcripción y traducción")
+    font_row.addWidget(font_size)
+    settings_layout.addLayout(font_row)
+
+    always_on_top_box = QCheckBox("Mantener la ventana siempre encima")
+    always_on_top_box.setChecked(always_on_top)
+    always_on_top_box.setToolTip("Mantener la ventana sobre las demás ventanas")
+    settings_layout.addWidget(always_on_top_box)
+
+    theme_row = QHBoxLayout()
+    theme_row.addWidget(QLabel("Tema de la aplicación"))
+    theme_combo = QComboBox()
+    theme_combo.addItems(["Claro", "Oscuro", "Sistema"])
+    saved_theme = str(settings.value("theme", "Oscuro"))
+    theme_combo.setCurrentText(saved_theme if saved_theme in ("Claro", "Oscuro", "Sistema") else "Oscuro")
+    theme_combo.setToolTip("Usar tema claro, oscuro o seguir el tema del sistema operativo")
+    theme_row.addWidget(theme_combo, 1)
+    settings_layout.addLayout(theme_row)
+
+    open_transcripts = QPushButton("Abrir carpeta de transcripciones")
+    open_transcripts.setToolTip("Abrir en el Explorador de Windows los archivos originales guardados")
+    settings_layout.addWidget(open_transcripts)
+    settings_layout.addStretch()
+
+    settings_note = QLabel("Los cambios se guardan automáticamente.")
+    settings_note.setWordWrap(True)
+    settings_layout.addWidget(settings_note)
+
     worker = None
+    transcript_path = None
+
+    def transcripts_directory():
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data) / "Real-Time Local Translator" / "transcripts"
+        return Path.home() / "Documents" / "Real-Time Local Translator" / "Transcripciones"
+
+    def open_transcripts_folder():
+        folder = transcripts_directory()
+        folder.mkdir(parents=True, exist_ok=True)
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if not opened:
+            QMessageBox.warning(window, "No se pudo abrir la carpeta", f"Abre esta ruta manualmente:\\n{folder}")
+
+    def apply_selected_theme(name):
+        apply_theme(name)
+        settings.setValue("theme", name)
+        settings_note.setText(f"Tema aplicado: {name}.")
+
 
     def show_error_dialog(title, message):
         # Use a real text editor instead of QMessageBox so the complete error can
@@ -289,6 +404,7 @@ def run_gui(application) -> int:
         settings.setValue("target", target.currentData())
         settings.setValue("show_original", show_original.isChecked())
         settings.setValue("font_size", font_size.value())
+        settings.setValue("theme", theme_combo.currentText())
 
     def set_always_on_top(enabled):
         window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
@@ -302,6 +418,7 @@ def run_gui(application) -> int:
         target.setEnabled(True)
         font_size.setEnabled(True)
         always_on_top_box.setEnabled(True)
+        theme_combo.setEnabled(True)
 
     def start_session():
         nonlocal worker
@@ -331,8 +448,10 @@ def run_gui(application) -> int:
         target.setEnabled(False)
         font_size.setEnabled(False)
         always_on_top_box.setEnabled(False)
+        theme_combo.setEnabled(False)
 
     def append_translation(lang, translated, source, is_final):
+        nonlocal transcript_path
         if not is_final:
             # Streaming ASR hypotheses are provisional and are not translated yet.
             # Show them visibly instead of hiding them in the small status bar.
@@ -345,16 +464,37 @@ def run_gui(application) -> int:
         live_preview.setVisible(False)
         from html import escape
 
+        # Persist only finalized original-language text, independently of whether
+        # the user chooses to display the original text in the UI.
+        if source and source.strip():
+            folder = transcripts_directory()
+            folder.mkdir(parents=True, exist_ok=True)
+            if transcript_path is None:
+                transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+                transcript_path.write_text(
+                    "Transcripción original — Real-Time Local Translator\\n"
+                    f"Sesión iniciada: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
+                    "El contenido de este archivo se guarda localmente en el equipo.\\n\\n",
+                    encoding="utf-8",
+                )
+            with transcript_path.open("a", encoding="utf-8") as transcript_file:
+                transcript_file.write(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] "
+                    f"[{(lang or 'auto').upper()}] {source.strip()}\\n"
+                )
+
+        source_color = "#aebbc9" if current_theme["dark"] else "#64748b"
+        translated_color = "#f8fafc" if current_theme["dark"] else "#0f172a"
         if show_original.isChecked():
             output.append(
                 f'<div style="margin-bottom: 14px;">'
-                f'<div style="color:#aebbc9;">{escape(source)}</div>'
-                f'<div style="margin-top:4px; font-weight:700; color:#f8fafc;">{escape(translated)}</div>'
+                f'<div style="color:{source_color};">{escape(source)}</div>'
+                f'<div style="margin-top:4px; font-weight:700; color:{translated_color};">{escape(translated)}</div>'
                 f'</div>'
             )
         else:
             output.append(
-                f'<div style="margin-bottom: 14px; font-weight:700; color:#f8fafc;">'
+                f'<div style="margin-bottom: 14px; font-weight:700; color:{translated_color};">'
                 f'{escape(translated)}</div>'
             )
 
@@ -371,8 +511,8 @@ def run_gui(application) -> int:
         output.clear()
 
     def change_font_size(value):
-        output.setStyleSheet(f"font-size: {value}px;")
         settings.setValue("font_size", value)
+        apply_theme(theme_combo.currentText())
 
     def close_event(event):
         save_preferences()
@@ -388,6 +528,9 @@ def run_gui(application) -> int:
     font_size.valueChanged.connect(change_font_size)
     show_original.toggled.connect(lambda _: save_preferences())
     target.currentIndexChanged.connect(lambda _: save_preferences())
+    theme_combo.currentTextChanged.connect(apply_selected_theme)
+    open_transcripts.clicked.connect(open_transcripts_folder)
+    settings_button.clicked.connect(settings_dialog.show)
     window.closeEvent = close_event
     start.clicked.connect(start_session)
     stop.clicked.connect(stop_session)
