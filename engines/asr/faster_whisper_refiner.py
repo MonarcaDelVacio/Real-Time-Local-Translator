@@ -81,10 +81,12 @@ class FasterWhisperRefiner(ASRRefiner):
             audio,
             language=language_code,
             task="transcribe",
-            beam_size=5,
-            best_of=5,
+            # Favor accuracy for the final correction pass. The streaming
+            # model already provides the quick preview while this pass runs.
+            beam_size=7,
+            patience=1.2,
             temperature=0.0,
-            condition_on_previous_text=False,
+            condition_on_previous_text=True,
             # The streaming endpoint already delimits the phrase. A second VAD pass
             # could discard short words during fast speech, so keep the complete audio.
             vad_filter=False,
