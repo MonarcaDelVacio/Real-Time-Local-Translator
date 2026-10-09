@@ -38,6 +38,11 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed." }
 $packagedExe = Join-Path (Get-Location) "dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"
 Write-Host "Running frozen-app import smoke test..."
 & $packagedExe --self-test
-if ($LASTEXITCODE -ne 0) { throw "Packaged application self-test failed with exit code $LASTEXITCODE." }
+if ($LASTEXITCODE -ne 0) {
+    $selfTestLog = Join-Path (Split-Path $packagedExe) "self-test-error.log"
+    if (Test-Path $selfTestLog) { Get-Content -LiteralPath $selfTestLog }
+    throw "Packaged application self-test failed with exit code $LASTEXITCODE."
+}
+Remove-Item (Join-Path (Split-Path $packagedExe) "self-test-error.log") -ErrorAction SilentlyContinue
 
 Write-Host "Build complete: dist\RealTimeLocalTranslator\RealTimeLocalTranslator.exe"

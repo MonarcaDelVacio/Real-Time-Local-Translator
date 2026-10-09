@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import importlib
 import sys
+import traceback
+from pathlib import Path
 
 
 def _self_test() -> int:
@@ -16,6 +18,8 @@ def _self_test() -> int:
         "engines.asr.faster_whisper_refiner",
         "engines.translation.argos_engine",
         "PySide6",
+        "PySide6.QtCore",
+        "PySide6.QtWidgets",
         "numpy",
         "soundcard",
         "sherpa_onnx",
@@ -24,18 +28,24 @@ def _self_test() -> int:
         "argostranslate",
         "huggingface_hub",
         "tqdm",
+        "tqdm.auto",
     )
-    for module_name in modules:
-        importlib.import_module(module_name)
+    try:
+        for module_name in modules:
+            importlib.import_module(module_name)
+    except Exception:
+        try:
+            log_path = Path(sys.argv[0]).resolve().parent / "self-test-error.log"
+            log_path.write_text(traceback.format_exc(), encoding="utf-8")
+        except Exception:
+            pass
+        return 1
     return 0
 
 
 def main() -> int:
     if "--self-test" in sys.argv[1:]:
-        try:
-            return _self_test()
-        except Exception:
-            return 1
+        return _self_test()
 
     from app.application.bootstrap import build_application
 
