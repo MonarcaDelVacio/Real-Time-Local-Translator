@@ -176,7 +176,16 @@ def run_gui(application) -> int:
     globals_for_theme = {}
     apply_theme(str(settings.value("theme", "Oscuro")))
 
-    window = QMainWindow()
+    class MainWindow(QMainWindow):
+        def closeEvent(self, event):
+            handler = getattr(self, "_close_event_handler", None)
+            if handler is not None:
+                handler(event)
+                if not event.isAccepted():
+                    return
+            super().closeEvent(event)
+
+    window = MainWindow()
     window.setWindowTitle("Real-Time Local Translator — Experimental 0.4.2")
     window.resize(1080, 720)
     window.setMinimumSize(820, 560)
@@ -540,7 +549,7 @@ def run_gui(application) -> int:
     theme_combo.currentTextChanged.connect(apply_selected_theme)
     open_transcripts.clicked.connect(open_transcripts_folder)
     settings_button.clicked.connect(settings_dialog.show)
-    window.closeEvent = close_event
+    window._close_event_handler = close_event
     start.clicked.connect(start_session)
     stop.clicked.connect(stop_session)
     clear.clicked.connect(clear_output)
