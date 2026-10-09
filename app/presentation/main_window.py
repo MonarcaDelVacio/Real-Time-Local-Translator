@@ -3,6 +3,24 @@ from __future__ import annotations
 import threading
 
 
+def append_transcript_text(path, text: str) -> None:
+    """Append only recognized words, formatting sentence boundaries for reading."""
+    clean_text = " ".join(text.split())
+    if not clean_text:
+        return
+
+    with open(path, "a+", encoding="utf-8") as transcript_file:
+        transcript_file.seek(0, 2)
+        file_size = transcript_file.tell()
+        separator = ""
+        if file_size:
+            transcript_file.seek(file_size - 1)
+            last_char = transcript_file.read(1)
+            separator = "\\n\\n" if last_char in ".!?…" else " "
+        transcript_file.seek(0, 2)
+        transcript_file.write(separator + clean_text)
+
+
 def run_gui(application) -> int:
     import os
     from pathlib import Path
@@ -492,21 +510,8 @@ def run_gui(application) -> int:
                 if transcript_path is None:
                     transcript_path = folder / f"Transcripcion_original_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.txt"
                     transcript_path.write_text("", encoding="utf-8")
-                # Save only the recognized words. Join sentence fragments with
-                # spaces and start a new paragraph when the previous fragment
-                # already ends a sentence; never add timestamps or metadata.
-                clean_text = " ".join(source.split())
-                if clean_text:
-                    with transcript_path.open("a+", encoding="utf-8") as transcript_file:
-                        transcript_file.seek(0, os.SEEK_END)
-                        file_size = transcript_file.tell()
-                        separator = ""
-                        if file_size:
-                            transcript_file.seek(file_size - 1)
-                            last_char = transcript_file.read(1)
-                            separator = "\\n\\n" if last_char in ".!?…" else " "
-                        transcript_file.seek(0, os.SEEK_END)
-                        transcript_file.write(separator + clean_text)
+                # Store plain recognized text only, without labels or timestamps.
+                append_transcript_text(transcript_path, source)
             except OSError as exc:
                 # A disk/permission problem must not discard the translation or
                 # crash the GUI slot; surface the save failure instead.
